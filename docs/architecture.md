@@ -1,6 +1,6 @@
 # Architecture
 
-## V1-V1.4
+## V1-V1.5
 
 Client / Maintenance System / Dashboard
         |
@@ -13,6 +13,7 @@ FastAPI API
         +--> Predictive Maintenance Risk
         +--> Root-Cause Analysis
         +--> Historical Failure Diagnosis
+        +--> Failure Pattern Learning
         +--> Part Lifecycle Intelligence
         +--> Spare Parts Intelligence
         |
@@ -46,7 +47,13 @@ Lifecycle states:
 - replace_now
 - unknown when no life limit is configured
 
-A replacement warning is triggered when any configured life meter reaches 80% utilization, and a replacement-due decision is triggered at 100%.
+A replacement warning is triggered when any configured life meter reaches 75% utilization, and a replacement-due decision is triggered at 100%.
+
+## Failure pattern learning
+
+Self-Brain groups historical breakdowns by machine, cause, fault code, and replaced part. When a new event arrives, it compares the current root-cause evidence with those patterns and produces an evidence-backed confidence score. A strong pattern is a prompt to investigate and verify the cause, not an automatic replacement command.
+
+Verified repair outcomes are stored separately as learning evidence. This lets future versions measure which historical repair patterns actually resolved failures and eventually train supervised failure models when enough labeled data exists.
 
 ## Closed learning loop
 
