@@ -6,6 +6,7 @@ from fastapi import APIRouter
 from app.services.health import evaluate_machine_health
 from ml.anomaly_detection import detect_anomalies
 from ml.predictive_maintenance import maintenance_risk, score_dataframe
+from ml.root_cause import analyze_root_causes
 from ml.spare_management import analyze_inventory, spare_status
 
 router = APIRouter(prefix="/api")
@@ -42,6 +43,31 @@ def anomalies() -> dict:
     scored = detect_anomalies(df)
     records = scored[["timestamp", "machine_id", "anomaly_label", "anomaly_score"]].to_dict(orient="records")
     return {"count": len(records), "anomalies": records}
+
+
+@router.post("/root-cause")
+def root_cause(payload: dict) -> dict:
+    return analyze_root_causes(payload)
+
+
+@router.get("/root-cause")
+def root_cause_history() -> dict:
+    df = pd.read_csv(DATA_PATH)
+    records = []
+    for row in df.to_dict(orient="records"):
+        analysis = analyze_root_causes(row)
+        records.append(
+            {
+                "timestamp": row.get("timestamp"),
+                "machine_id": row.get("machine_id"),
+                "fault_code": row.get("fault_code"),
+                "status": analysis["status"],
+                "cause_count": analysis["cause_count"],
+                "priority": analysis.get("priority", "none"),
+                "causes": [cause["cause"] for cause in analysis["causes"]],
+            }
+        )
+    return {"count": len(records), "root_cause_analysis": records}
 
 
 @router.get("/spares")
