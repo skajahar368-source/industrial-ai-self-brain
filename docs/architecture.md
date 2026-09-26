@@ -1,8 +1,8 @@
 # Architecture
 
-## V1-V1.3
+## V1-V1.4
 
-Client / Dashboard
+Client / Maintenance System / Dashboard
         |
         v
 FastAPI API
@@ -11,20 +11,53 @@ FastAPI API
         +--> Telemetry / Machine Data
         +--> Anomaly Detection
         +--> Predictive Maintenance Risk
+        +--> Root-Cause Analysis
+        +--> Historical Failure Diagnosis
+        +--> Part Lifecycle Intelligence
         +--> Spare Parts Intelligence
         |
         v
-Database (SQLite during MVP, PostgreSQL-ready later)
+Maintenance / Production Data Store
 
-## Intelligence flow
+## Part lifecycle intelligence
 
-Machine telemetry -> feature engineering -> anomaly detection -> maintenance risk -> spare recommendation.
+When a technician replaces a component, the maintenance system records:
 
-Maintenance history and spare consumption will later support trained forecasting and failure models.
+- machine and part identity
+- installation date
+- machine runtime at installation
+- production cycles at installation
+- rated runtime life
+- rated production life
+- rated calendar life
 
-## Design principles
+Self-Brain then compares the installed part against three independent life meters:
 
-- Explainable outputs are preferred over opaque recommendations.
-- ML predictions remain separate from safety-critical control logic.
-- Inventory recommendations include stock, usage, lead time, and criticality.
-- Real-time sensor ingestion and event-driven alerts are planned for future versions.
+1. Calendar age
+2. Machine runtime
+3. Production cycles
+
+The system calculates utilization and remaining life for each meter.
+
+Lifecycle states:
+
+- healthy
+- replacement_due_soon
+- replace_now
+- unknown when no life limit is configured
+
+A replacement warning is triggered when any configured life meter reaches 80% utilization, and a replacement-due decision is triggered at 100%.
+
+## Closed learning loop
+
+Machine -> sensor/production data -> health -> anomaly -> maintenance risk -> root cause -> historical failures -> part lifecycle -> spare recommendation -> technician decision -> replacement record -> new training/evidence data.
+
+This allows future versions to learn actual component life from real replacement outcomes instead of relying only on manufacturer-rated life.
+
+## Important design principle
+
+The system should not automatically replace a part. It should provide evidence:
+
+"Cooling Fan CF-24: 91% runtime life used, 78% production life used, 52% calendar life used. Runtime is the limiting meter. Inspect and plan replacement."
+
+A human maintenance decision remains the final action.
