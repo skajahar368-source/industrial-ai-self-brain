@@ -5,6 +5,7 @@ from fastapi import APIRouter
 
 from app.services.health import evaluate_machine_health
 from ml.anomaly_detection import detect_anomalies
+from ml.historical_diagnosis import diagnose_against_history
 from ml.predictive_maintenance import maintenance_risk, score_dataframe
 from ml.root_cause import analyze_root_causes
 from ml.spare_management import analyze_inventory, spare_status
@@ -68,6 +69,18 @@ def root_cause_history() -> dict:
             }
         )
     return {"count": len(records), "root_cause_analysis": records}
+
+
+@router.post("/diagnose")
+def diagnose(payload: dict) -> dict:
+    return diagnose_against_history(payload)
+
+
+@router.get("/diagnose/history")
+def diagnosis_history() -> dict:
+    history = pd.read_csv(Path("data/maintenance_history.csv"))
+    records = history.sort_values("timestamp", ascending=False).head(20).to_dict(orient="records")
+    return {"count": len(records), "maintenance_history": records}
 
 
 @router.get("/spares")
