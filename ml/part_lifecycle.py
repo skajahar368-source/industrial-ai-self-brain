@@ -7,6 +7,8 @@ from typing import Any
 import pandas as pd
 
 REPLACEMENT_HISTORY_PATH = Path("data/part_replacement_history.csv")
+WARNING_UTILIZATION_PERCENT = 75.0
+REPLACEMENT_UTILIZATION_PERCENT = 100.0
 
 
 def load_replacement_history() -> pd.DataFrame:
@@ -73,9 +75,12 @@ def calculate_part_life(
         status = "unknown"
         reason = "No configured life limit is available for this part."
     else:
-        max_utilization = max(m["utilization_percent"] for m in meters)
-        due_meters = [m for m in meters if m["utilization_percent"] >= 100]
-        warning_meters = [m for m in meters if m["utilization_percent"] >= 80]
+        due_meters = [
+            m for m in meters if m["utilization_percent"] >= REPLACEMENT_UTILIZATION_PERCENT
+        ]
+        warning_meters = [
+            m for m in meters if m["utilization_percent"] >= WARNING_UTILIZATION_PERCENT
+        ]
 
         if due_meters:
             status = "replace_now"
@@ -118,7 +123,6 @@ def active_part_life(
     if active.empty:
         return []
 
-    # The latest event for each part_id is treated as its active installation.
     active = active.drop_duplicates(subset=["part_id"], keep="first")
 
     return [
