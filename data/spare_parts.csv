@@ -1,0 +1,9 @@
+spare_id,part_name,machine_type,stock_quantity,minimum_stock,reorder_point,monthly_usage,lead_time_days,unit_cost,supplier,critical
+SP-001,Bearing 6204,Motor,18,10,12,8,14,450,Industrial Bearings Co,true
+SP-002,Vibration Sensor VS-10,Compressor,4,5,6,2,21,3200,SensorTech India,true
+SP-003,Pressure Gauge PG-100,Compressor,12,5,7,3,14,1850,Pressure Instruments,false
+SP-004,Drive Belt B-42,Pump,3,4,5,2,10,780,PowerDrive Supplies,false
+SP-005,Cooling Fan CF-24,Motor,1,3,4,1,18,1450,Thermal Systems,true
+SP-006,Contactor 32A,Motor,9,4,6,3,12,620,Electrical Parts Hub,false
+SP-007,Hydraulic Seal HS-20,Hydraulic Press,2,3,4,1,20,950,HydroSeal India,true
+SP-008,Air Filter AF-10,Compressor,15,6,8,4,7,390,Filtration Works,false
