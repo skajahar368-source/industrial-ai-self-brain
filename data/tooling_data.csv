@@ -1,0 +1,4 @@
+tool_id,applicator_id,terminal,wire_awg,crimp_height_mm,crimp_width_mm,ich_mm,trim_height_mm,qualification_status,last_maintenance
+T-001,A-100,TERM-01,22,1.25,1.80,0.90,1.10,qualified,2026-08-20
+T-002,A-101,TERM-02,24,1.18,1.72,0.86,1.05,qualified,2026-08-28
+T-003,A-102,TERM-03,26,1.12,1.65,0.82,1.02,inspection_due,2026-07-15
