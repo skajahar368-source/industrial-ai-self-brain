@@ -1,0 +1,15 @@
+reason_code,description
+misalignment,Part or shaft alignment is outside the required condition.
+cleaning_issue,Dirt dust contamination or blocked airflow caused abnormal operation.
+lubrication_issue,Insufficient incorrect or degraded lubrication contributed to wear.
+overheating,Excessive temperature or thermal stress caused degradation.
+excessive_vibration,Abnormal vibration or mechanical imbalance caused degradation.
+abnormal_pressure,Pressure outside the normal operating range caused damage.
+electrical_fault,Electrical fault overload short circuit or unstable supply caused damage.
+overload,The component experienced load beyond its intended operating condition.
+wear_and_tear,Normal physical wear was observed before rated life was reached.
+foreign_material,A foreign object or contamination damaged the component.
+installation_error,Incorrect installation torque seating or assembly contributed to failure.
+material_defect,A suspected material or manufacturing defect was found.
+operator_or_process_issue,Operating or process conditions contributed to the failure.
+unknown,Cause is not yet confirmed; further investigation is required.
