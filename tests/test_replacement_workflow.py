@@ -7,6 +7,7 @@ def base_payload():
         "evidence_type": "measurement",
         "corrective_action": "Corrected alignment and checked coupling.",
         "verification_result": "Machine test run completed without abnormal vibration.",
+        "cause_cleared": True,
         "replacement_approved": True,
     }
 
@@ -26,6 +27,13 @@ def test_early_replacement_requires_reason():
 def test_early_replacement_requires_verification():
     payload = base_payload()
     payload["verification_result"] = ""
+    result = validate_early_replacement(payload)
+    assert result["status"] == "blocked"
+
+
+def test_early_replacement_requires_cause_clearance():
+    payload = base_payload()
+    payload["cause_cleared"] = False
     result = validate_early_replacement(payload)
     assert result["status"] == "blocked"
 
