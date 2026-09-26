@@ -1,0 +1,5 @@
+replacement_id,machine_id,part_id,part_name,installed_date,runtime_hours_at_install,production_cycles_at_install,life_runtime_hours,life_production_cycles,life_calendar_days
+PR-001,M-001,SP-005,Cooling Fan CF-24,2026-09-20,1520,15200,3000,50000,365
+PR-002,M-001,SP-001,Bearing 6204,2026-09-21,1540,15500,5000,100000,730
+PR-003,M-002,SP-003,Pressure Gauge PG-100,2026-09-22,900,8200,4000,80000,730
+PR-004,M-003,SP-006,Contactor 32A,2026-09-25,610,6400,6000,120000,730
