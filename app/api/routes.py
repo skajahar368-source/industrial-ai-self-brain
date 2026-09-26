@@ -8,6 +8,7 @@ from ml.anomaly_detection import detect_anomalies
 from ml.historical_diagnosis import diagnose_against_history
 from ml.part_lifecycle import active_part_life
 from ml.predictive_maintenance import maintenance_risk, score_dataframe
+from ml.replacement_workflow import validate_early_replacement
 from ml.root_cause import analyze_root_causes
 from ml.spare_management import analyze_inventory, spare_status
 
@@ -107,11 +108,22 @@ def record_part_replacement(payload: dict) -> dict:
     if missing:
         return {"error": "Missing required fields", "fields": missing}
 
+    if payload.get("early_replacement", False):
+        validation = validate_early_replacement(payload)
+        if validation["status"] == "blocked":
+            return validation
+        payload = {**payload, **validation}
+
     history = pd.read_csv(PART_HISTORY_PATH)
     new_row = pd.DataFrame([payload])
     history = pd.concat([history, new_row], ignore_index=True)
     history.to_csv(PART_HISTORY_PATH, index=False)
     return {"status": "recorded", "replacement": payload}
+
+
+@router.post("/part-replacement/validate")
+def validate_part_replacement(payload: dict) -> dict:
+    return validate_early_replacement(payload)
 
 
 @router.get("/spares")
