@@ -30,11 +30,12 @@ REQUIRED_EVIDENCE = {
 
 
 def validate_early_replacement(payload: dict[str, Any]) -> dict[str, Any]:
-    """Require a reason, evidence, corrective action, and verification for early replacement."""
+    """Validate an early-replacement investigation before it enters maintenance history."""
     reason = payload.get("reason_code")
     evidence = payload.get("evidence_type")
     corrective_action = str(payload.get("corrective_action", "")).strip()
     verification = str(payload.get("verification_result", "")).strip()
+    cause_cleared = bool(payload.get("cause_cleared", False))
     replacement_approved = bool(payload.get("replacement_approved", False))
 
     errors = []
@@ -44,8 +45,10 @@ def validate_early_replacement(payload: dict[str, Any]) -> dict[str, Any]:
         errors.append("A valid evidence_type is required.")
     if not corrective_action:
         errors.append("corrective_action is required.")
+    if not cause_cleared:
+        errors.append("cause_cleared must be true after the suspected cause is addressed.")
     if not verification:
-        errors.append("verification_result is required.")
+        errors.append("verification_result is required after the corrective action.")
     if not replacement_approved:
         errors.append("replacement_approved must be true before an early replacement can be closed.")
 
@@ -58,6 +61,7 @@ def validate_early_replacement(payload: dict[str, Any]) -> dict[str, Any]:
         "reason_description": EARLY_REPLACEMENT_REASONS[reason],
         "evidence_type": evidence,
         "corrective_action": corrective_action,
+        "cause_cleared": True,
         "verification_result": verification,
         "replacement_approved": True,
     }
