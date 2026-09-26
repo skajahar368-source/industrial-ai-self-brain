@@ -33,3 +33,7 @@ Python, Pandas, NumPy, scikit-learn, FastAPI, SQLite/PostgreSQL-ready architectu
 ## Disclaimer
 
 This is a portfolio and engineering prototype. It is not intended to control production equipment without appropriate industrial validation and safety controls.
+
+## V1.2 Predictive Maintenance
+
+The MVP now calculates an explainable 0-100 maintenance-risk score using sensor values, downtime, and fault codes. The API exposes both single-reading scoring and historical telemetry scoring. A future supervised model can replace this transparent baseline once labeled maintenance/failure history is available.
