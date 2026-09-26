@@ -6,6 +6,7 @@ from fastapi import APIRouter
 from app.services.health import evaluate_machine_health
 from ml.anomaly_detection import detect_anomalies
 from ml.historical_diagnosis import diagnose_against_history
+from ml.part_lifecycle import active_part_life
 from ml.predictive_maintenance import maintenance_risk, score_dataframe
 from ml.root_cause import analyze_root_causes
 from ml.spare_management import analyze_inventory, spare_status
@@ -13,6 +14,7 @@ from ml.spare_management import analyze_inventory, spare_status
 router = APIRouter(prefix="/api")
 DATA_PATH = Path("data/machine_data.csv")
 SPARES_PATH = Path("data/spare_parts.csv")
+PART_HISTORY_PATH = Path("data/part_replacement_history.csv")
 
 
 @router.get("/health")
@@ -81,6 +83,35 @@ def diagnosis_history() -> dict:
     history = pd.read_csv(Path("data/maintenance_history.csv"))
     records = history.sort_values("timestamp", ascending=False).head(20).to_dict(orient="records")
     return {"count": len(records), "maintenance_history": records}
+
+
+@router.get("/part-lifecycle/{machine_id}")
+def part_lifecycle(machine_id: str, runtime_hours: float, production_cycles: float, as_of: str | None = None) -> dict:
+    parts = active_part_life(
+        machine_id=machine_id,
+        current_runtime_hours=runtime_hours,
+        current_production_cycles=production_cycles,
+        as_of=as_of,
+    )
+    return {"machine_id": machine_id, "count": len(parts), "parts": parts}
+
+
+@router.post("/part-replacements")
+def record_part_replacement(payload: dict) -> dict:
+    required = [
+        "replacement_id", "machine_id", "part_id", "part_name", "installed_date",
+        "runtime_hours_at_install", "production_cycles_at_install",
+        "life_runtime_hours", "life_production_cycles", "life_calendar_days",
+    ]
+    missing = [field for field in required if field not in payload]
+    if missing:
+        return {"error": "Missing required fields", "fields": missing}
+
+    history = pd.read_csv(PART_HISTORY_PATH)
+    new_row = pd.DataFrame([payload])
+    history = pd.concat([history, new_row], ignore_index=True)
+    history.to_csv(PART_HISTORY_PATH, index=False)
+    return {"status": "recorded", "replacement": payload}
 
 
 @router.get("/spares")
