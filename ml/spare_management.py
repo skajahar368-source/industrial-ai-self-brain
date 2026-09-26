@@ -27,7 +27,7 @@ def spare_status(item: dict[str, Any]) -> dict[str, Any]:
         action = "No immediate replenishment required."
 
     if critical and status in {"out_of_stock", "reorder"}:
-        action = "Priority procurement required for critical spare."
+        action = "Immediate procurement required. Priority for critical spare."
 
     months_remaining = None
     if monthly_usage > 0:
