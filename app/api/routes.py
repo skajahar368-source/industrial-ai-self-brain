@@ -6,6 +6,12 @@ from fastapi import APIRouter
 from app.services.health import evaluate_machine_health
 from ml.anomaly_detection import detect_anomalies
 from ml.historical_diagnosis import diagnose_against_history
+from ml.failure_pattern_learning import (
+    build_failure_patterns,
+    learn_failure_pattern,
+    record_learning_outcome,
+    summarize_learning_outcomes,
+)
 from ml.part_lifecycle import active_part_life
 from ml.predictive_maintenance import maintenance_risk, score_dataframe
 from ml.replacement_workflow import validate_early_replacement
@@ -77,6 +83,27 @@ def root_cause_history() -> dict:
 @router.post("/diagnose")
 def diagnose(payload: dict) -> dict:
     return diagnose_against_history(payload)
+
+
+@router.get("/failure-patterns")
+def failure_patterns(machine_id: str | None = None) -> dict:
+    patterns = build_failure_patterns(machine_id)
+    return {"count": len(patterns), "patterns": patterns}
+
+
+@router.post("/failure-patterns/learn")
+def failure_pattern_learning(payload: dict) -> dict:
+    return learn_failure_pattern(payload)
+
+
+@router.post("/failure-patterns/outcomes")
+def failure_pattern_outcome(payload: dict) -> dict:
+    return record_learning_outcome(payload)
+
+
+@router.get("/failure-patterns/summary")
+def failure_pattern_summary() -> dict:
+    return summarize_learning_outcomes()
 
 
 @router.get("/diagnose/history")
