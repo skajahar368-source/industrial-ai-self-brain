@@ -1,0 +1,4 @@
+event_timestamp,machine_id,fault_code,cause,part_replaced,repair_successful,verification_result
+2026-09-20T10:00:00,M-001,F-101,Overheating,Cooling Fan CF-24,true,Temperature returned to normal after airflow cleaning and fan replacement.
+2026-09-21T15:30:00,M-001,F-203,Excessive vibration,Bearing 6204,true,Vibration returned to normal after bearing replacement and alignment check.
+2026-09-25T12:30:00,M-003,F-410,Electrical fault,Contactor 32A,true,Machine test run completed without repeat electrical fault.
