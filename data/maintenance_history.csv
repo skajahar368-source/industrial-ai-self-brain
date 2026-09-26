@@ -1,0 +1,6 @@
+timestamp,machine_id,event_type,fault_code,cause,part_replaced,action_taken,downtime_minutes
+2026-09-20T08:30:00,M-001,breakdown,F-101,Overheating,Cooling Fan CF-24,Replaced cooling fan and cleaned airflow path,65
+2026-09-21T14:10:00,M-001,breakdown,F-203,Excessive vibration,Bearing 6204,Replaced bearing and checked alignment,48
+2026-09-22T09:20:00,M-002,breakdown,F-305,Abnormal pressure,Pressure Gauge PG-100,Replaced gauge and inspected pressure line,35
+2026-09-24T16:40:00,M-001,breakdown,F-101,Overheating,Cooling Fan CF-24,Inspected cooling system,55
+2026-09-25T11:15:00,M-003,breakdown,F-410,Electrical fault,Contactor 32A,Replaced contactor,42
