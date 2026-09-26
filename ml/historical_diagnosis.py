@@ -30,13 +30,26 @@ def diagnose_against_history(payload: dict[str, Any]) -> dict[str, Any]:
 
     current = analyze_root_causes(payload)
     current_causes = {_normalize(x["cause"]) for x in current["causes"]}
+    current_fault_code = _normalize(payload.get("fault_code", ""))
 
     last_event = history.iloc[0].to_dict() if not history.empty else None
     matching_events = []
 
     if not history.empty and current_causes:
         for row in history.to_dict(orient="records"):
-            if _normalize(row["cause"]) in current_causes:
+            cause_matches = _normalize(row["cause"]) in current_causes
+            historical_fault_code = _normalize(row.get("fault_code", ""))
+
+            # A part recommendation needs stronger evidence than a symptom-only
+            # match. When both sides have fault codes, require those codes to
+            # agree before treating the historical event as a direct match.
+            fault_code_matches = (
+                not current_fault_code
+                or not historical_fault_code
+                or current_fault_code == historical_fault_code
+            )
+
+            if cause_matches and fault_code_matches:
                 matching_events.append(row)
 
     recommendation = {
