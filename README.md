@@ -1,47 +1,102 @@
 # Industrial AI — Self-Brain
 
-An industrial AI system designed around machine health monitoring, anomaly detection, predictive maintenance, root-cause assistance, failure-pattern learning, part lifecycle intelligence, and spare-parts management.
+An industrial AI prototype for machine-health monitoring, anomaly detection, predictive maintenance, degradation analysis, failure prediction, root-cause assistance, failure-pattern learning, part lifecycle intelligence, and spare-parts management.
 
 ## Vision
 
-Machine -> Sensors/Data -> AI/ML -> Diagnosis -> Recommendation -> Human/Action -> Learning
+```
+Machine / Telemetry
+        ↓
+   Self-Brain AI/ML
+        ↓
+Health → Anomaly → Risk → Trend → RCA → Failure Prediction
+        ↓
+Maintenance Recommendation
+        ↓
+Human Maintenance Decision
+        ↓
+Learning / History
+```
 
-## V1 MVP
+The system is intentionally **decision-support software**. Human maintenance personnel remain responsible for operational decisions.
 
-- Machine health monitoring
-- Sensor-data simulation
-- Rule-based health status
-- Anomaly detection foundation
-- Maintenance recommendation foundation
-- Part lifecycle and spare-management data model
-- API and dashboard-ready project structure
+## Current implementation
 
-## Roadmap
+### Real-time telemetry boundary
+- Single-reading ingestion at `POST /api/telemetry/ingest`
+- Batch ingestion at `POST /api/telemetry/ingest-batch`
+- Validation, normalization, UTC timestamps, and duplicate protection
+- Deterministic machine telemetry simulation for controlled testing
 
-1. Machine monitoring and synthetic data
-2. ML anomaly detection
-3. Predictive maintenance
-4. Failure-pattern learning
-5. AI industrial assistant
-6. Real-time industrial integration
-7. Supervised failure prediction and remaining-useful-life models
+### Machine intelligence
+- Rule-based machine health evaluation
+- Explainable maintenance-risk scoring
+- Isolation Forest anomaly detection
+- Time-series trend analysis
+- Degradation timeline and direction analysis
+- Explainable root-cause analysis
+- Historical failure diagnosis
+- Failure-pattern learning and outcome recording
 
-## Tech Stack
+### Predictive maintenance
+- Supervised failure-prediction dataset construction
+- Time-based train/test split
+- Random Forest failure classifier
+- Accuracy, precision, recall, and ROC-AUC metrics when calculable
+- Failure-risk prediction with an explicit human-decision requirement
+- Model warning that representative labeled machine history is required before operational use
 
-Python, Pandas, NumPy, scikit-learn, FastAPI, SQLite/PostgreSQL-ready architecture, and a future React dashboard.
+### Industrial maintenance intelligence
+- Part lifecycle tracking
+- Part replacement workflow validation
+- Spare inventory and reorder alerts
+- Grounded industrial assistant combining current telemetry and maintenance evidence
 
-## Disclaimer
+### Dashboard
+A read-only industrial control-room dashboard is available from the FastAPI application. It displays current health, maintenance risk, anomaly status, recent telemetry, trend/degradation information, spare alerts, and the industrial assistant.
 
-This is a portfolio and engineering prototype. It is not intended to control production equipment without appropriate industrial validation and safety controls.
+## Validation status
 
-## V1.7 Real-Time Telemetry Ingestion
+The project currently has an automated end-to-end validation path covering:
 
-The system now has a validated telemetry-ingestion boundary at `POST /api/telemetry/ingest` and batch ingestion at `POST /api/telemetry/ingest-batch`. Events are normalized, validated, timestamped, deduplicated by machine/sequence ID, and stored in the telemetry stream. The AI industrial assistant reads the newest ingested telemetry first and falls back to the sample dataset when no live event exists.
+1. Simulated normal telemetry
+2. Simulated warning telemetry
+3. Simulated failure telemetry
+4. Telemetry ingestion
+5. Dashboard overview
+6. Health evaluation
+7. Maintenance-risk analysis
+8. Trend deterioration
+9. Degradation timeline
+10. Failure-model training
+11. Failure-probability prediction
+12. Human-decision requirement
 
-## V1.6 AI Industrial Assistant
+The CI workflow runs the complete pytest suite on Python 3.11.
 
-The system now exposes a grounded industrial assistant at `POST /api/assistant/ask`. It combines the latest machine reading with health status, anomaly detection, maintenance risk, root-cause evidence, historical failure patterns, lifecycle data when supplied, and spare information. Responses cite the underlying evidence in the API payload and keep the human maintenance decision final.
+**Current claim:** the software prototype and simulated end-to-end workflow are working and tested.
 
-## V1.2 Predictive Maintenance
+**Not yet proven:** production failure-prediction accuracy, real PLC/SCADA/OPC-UA/MQTT integration, representative real-machine failure data, sensor quality, machine-specific baselines, and production safety.
 
-The MVP now calculates an explainable 0-100 maintenance-risk score using sensor values, downtime, and fault codes. The API exposes both single-reading scoring and historical telemetry scoring. A future supervised model can replace this transparent baseline once labeled maintenance/failure history is available.
+## Validation-first roadmap
+
+- **Validation Center:** deliberately test normal, warning, failure, missing, duplicate, invalid, stale, and contradictory telemetry.
+- **V2.4:** advanced root-cause correlation after validation gaps are understood.
+- **V2.5:** continuous learning using verified maintenance outcomes.
+- **V3.x:** production-style deployment and real industrial data integration.
+- **Future:** PLC/SCADA/OPC-UA/MQTT/IIoT integrations, multi-machine intelligence, RUL, MLOps, explainability, and digital-twin workflows.
+
+## Testing
+
+Run locally:
+
+```bash
+pip install -r requirements.txt
+PYTHONPATH=. pytest -q
+```
+
+GitHub Actions runs the same test suite on pushes to `main` and pull requests.
+
+## Safety
+
+This is a portfolio and engineering prototype. It must not directly control production equipment without appropriate industrial validation, cybersecurity controls, safety systems, and qualified engineering review.
