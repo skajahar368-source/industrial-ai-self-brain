@@ -76,7 +76,8 @@ def ask_industrial_assistant(payload: dict[str, Any]) -> dict[str, Any]:
 
     health = evaluate_machine_health(reading)
     risk = maintenance_risk(reading)
-    anomaly = score_machine_reading(reading)
+    baseline = pd.read_csv(MACHINE_DATA_PATH)
+    anomaly = score_machine_reading(reading, baseline)
     root_cause = analyze_root_causes(reading)
     causes = [item["cause"] for item in root_cause["causes"]]
 
