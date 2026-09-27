@@ -7,6 +7,7 @@ from app.services.health import evaluate_machine_health
 from ml.anomaly_detection import detect_anomalies
 from ml.historical_diagnosis import diagnose_against_history
 from ml.industrial_assistant import ask_industrial_assistant
+from ml.telemetry_ingestion import ingest_batch, ingest_reading, recent_telemetry
 from ml.failure_pattern_learning import (
     build_failure_patterns,
     learn_failure_pattern,
@@ -28,6 +29,28 @@ PART_HISTORY_PATH = Path("data/part_replacement_history.csv")
 @router.get("/health")
 def api_health() -> dict:
     return {"status": "healthy"}
+
+
+@router.post("/telemetry/ingest")
+def telemetry_ingest(payload: dict) -> dict:
+    try:
+        return ingest_reading(payload)
+    except ValueError as exc:
+        return {"status": "rejected", "error": str(exc)}
+
+
+@router.post("/telemetry/ingest-batch")
+def telemetry_ingest_batch(payload: list[dict]) -> dict:
+    return ingest_batch(payload)
+
+
+@router.get("/telemetry")
+def telemetry(machine_id: str | None = None, limit: int = 20) -> dict:
+    try:
+        records = recent_telemetry(machine_id=machine_id, limit=limit)
+    except ValueError as exc:
+        return {"status": "rejected", "error": str(exc)}
+    return {"count": len(records), "telemetry": records}
 
 
 @router.post("/assistant/ask")
