@@ -1,6 +1,6 @@
 # Architecture
 
-## V1-V1.6
+## V1-V1.7
 
 Client / Maintenance System / Dashboard
         |
@@ -9,6 +9,7 @@ FastAPI API
         |
         +--> Machine Health Engine
         +--> Telemetry / Machine Data
+        +--> Real-Time Telemetry Ingestion
         +--> Anomaly Detection
         +--> Predictive Maintenance Risk
         +--> Root-Cause Analysis
@@ -55,6 +56,10 @@ A replacement warning is triggered when any configured life meter reaches 75% ut
 Self-Brain groups historical breakdowns by machine, cause, fault code, and replaced part. When a new event arrives, it compares the current root-cause evidence with those patterns and produces an evidence-backed confidence score. A strong pattern is a prompt to investigate and verify the cause, not an automatic replacement command.
 
 Verified repair outcomes are stored separately as learning evidence. This lets future versions measure which historical repair patterns actually resolved failures and eventually train supervised failure models when enough labeled data exists.
+
+## Real-time telemetry ingestion
+
+Industrial sources such as PLC gateways, SCADA historians, IoT collectors, or maintenance systems can send normalized telemetry to the ingestion API. The ingestion layer validates required fields and numeric ranges, normalizes timestamps, assigns source metadata, rejects malformed events, and prevents duplicate sequence IDs from being stored. The stored telemetry stream becomes the live input boundary for downstream intelligence.
 
 ## AI industrial assistant
 
