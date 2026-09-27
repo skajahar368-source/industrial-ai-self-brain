@@ -9,6 +9,7 @@ from ml.historical_diagnosis import diagnose_against_history
 from ml.industrial_assistant import ask_industrial_assistant
 from ml.telemetry_ingestion import ingest_batch, ingest_reading, recent_telemetry
 from ml.time_series_intelligence import analyze_trends
+from ml.validation_center import run_validation_suite
 from ml.degradation_timeline import build_degradation_timeline
 from ml.telemetry_simulator import generate_batch, generate_reading
 from ml.failure_prediction_service import predict_latest, train_failure_predictor
@@ -102,6 +103,12 @@ def failure_prediction(payload: dict) -> dict:
 @router.post("/assistant/ask")
 def industrial_assistant(payload: dict) -> dict:
     return ask_industrial_assistant(payload)
+
+
+@router.get("/validation/run")
+def validation_run() -> dict:
+    """Run the deterministic software validation suite without storing telemetry."""
+    return run_validation_suite()
 
 
 @router.get("/dashboard/overview")
