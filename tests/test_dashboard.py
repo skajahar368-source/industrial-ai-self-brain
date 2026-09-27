@@ -19,3 +19,23 @@ def test_dashboard_overview_returns_machine_snapshot():
     assert "anomaly" in body
     assert "root_cause" in body
     assert "spare_alerts" in body
+
+def test_simulation_endpoint_generates_reading():
+    response = client.post(
+        "/api/telemetry/simulate",
+        json={"machine_id": "M-SIM-001", "step": 10, "scenario": "failure"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "accepted"
+    assert body["reading"]["fault_code"] == "HIGH_TEMP_PRESSURE"
+
+
+def test_simulation_batch_endpoint_generates_multiple_readings():
+    response = client.post(
+        "/api/telemetry/simulate-batch",
+        json={"machine_id": "M-SIM-002", "start_step": 0, "count": 3, "scenario": "warning"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["accepted"] == 3
