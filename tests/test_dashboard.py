@@ -46,3 +46,10 @@ def test_dashboard_overview_includes_trend_analysis():
     body = response.json()
     assert "trend_analysis" in body
     assert body["trend_analysis"]["status"] in {"ok", "insufficient_data"}
+
+def test_dashboard_overview_includes_degradation_timeline():
+    response = client.get("/api/dashboard/overview?machine_id=M-001")
+    assert response.status_code == 200
+    body = response.json()
+    assert "degradation_timeline" in body
+    assert body["degradation_timeline"]["status"] in {"ok", "insufficient_data"}
