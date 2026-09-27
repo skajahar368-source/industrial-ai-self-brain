@@ -1,6 +1,6 @@
 # Industrial AI — Self-Brain
 
-An industrial AI system designed around machine health monitoring, anomaly detection, predictive maintenance, root-cause assistance, tooling intelligence, and spare-parts management.
+An industrial AI system designed around machine health monitoring, anomaly detection, predictive maintenance, root-cause assistance, failure-pattern learning, part lifecycle intelligence, and spare-parts management.
 
 ## Vision
 
@@ -13,7 +13,7 @@ Machine -> Sensors/Data -> AI/ML -> Diagnosis -> Recommendation -> Human/Action 
 - Rule-based health status
 - Anomaly detection foundation
 - Maintenance recommendation foundation
-- Tooling and spare-management data model
+- Part lifecycle and spare-management data model
 - API and dashboard-ready project structure
 
 ## Roadmap
@@ -21,10 +21,10 @@ Machine -> Sensors/Data -> AI/ML -> Diagnosis -> Recommendation -> Human/Action 
 1. Machine monitoring and synthetic data
 2. ML anomaly detection
 3. Predictive maintenance
-4. Tooling/crimping intelligence
-5. Spare management
-6. Root-cause AI assistant
-7. Real-time industrial integration
+4. Failure-pattern learning
+5. AI industrial assistant
+6. Real-time industrial integration
+7. Supervised failure prediction and remaining-useful-life models
 
 ## Tech Stack
 
@@ -33,6 +33,10 @@ Python, Pandas, NumPy, scikit-learn, FastAPI, SQLite/PostgreSQL-ready architectu
 ## Disclaimer
 
 This is a portfolio and engineering prototype. It is not intended to control production equipment without appropriate industrial validation and safety controls.
+
+## V1.6 AI Industrial Assistant
+
+The system now exposes a grounded industrial assistant at `POST /api/assistant/ask`. It combines the latest machine reading with health status, anomaly detection, maintenance risk, root-cause evidence, historical failure patterns, lifecycle data when supplied, and spare information. Responses cite the underlying evidence in the API payload and keep the human maintenance decision final.
 
 ## V1.2 Predictive Maintenance
 
