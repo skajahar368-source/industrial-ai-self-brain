@@ -1,0 +1,1 @@
+timestamp,machine_id,temperature_c,pressure_bar,vibration_mm_s,cycle_count,downtime_minutes,fault_code,source,sequence_id,received_at
