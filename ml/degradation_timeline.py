@@ -2,8 +2,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from app.services.health import assess_health
-from ml.predictive_maintenance import calculate_maintenance_risk
+from app.services.health import evaluate_machine_health
+from ml.predictive_maintenance import maintenance_risk
 
 
 def build_degradation_timeline(readings: list[dict[str, Any]]) -> dict[str, Any]:
@@ -14,8 +14,8 @@ def build_degradation_timeline(readings: list[dict[str, Any]]) -> dict[str, Any]
     ordered = sorted(readings, key=lambda x: str(x.get("timestamp", "")))
     timeline = []
     for reading in ordered:
-        health = assess_health(reading)
-        risk = calculate_maintenance_risk(reading)
+        health = evaluate_machine_health(reading)
+        risk = maintenance_risk(reading)
         timeline.append({
             "timestamp": reading.get("timestamp"),
             "temperature_c": reading.get("temperature_c"),
@@ -23,7 +23,7 @@ def build_degradation_timeline(readings: list[dict[str, Any]]) -> dict[str, Any]
             "vibration_mm_s": reading.get("vibration_mm_s"),
             "fault_code": reading.get("fault_code", "NONE"),
             "health_status": health.get("status"),
-            "maintenance_risk": risk.get("risk_score"),
+            "maintenance_risk": risk.get("maintenance_risk_score"),
         })
 
     scores = [float(item["maintenance_risk"]) for item in timeline]
