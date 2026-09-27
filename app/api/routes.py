@@ -6,6 +6,7 @@ from fastapi import APIRouter
 from app.services.health import evaluate_machine_health
 from ml.anomaly_detection import detect_anomalies
 from ml.historical_diagnosis import diagnose_against_history
+from ml.industrial_assistant import ask_industrial_assistant
 from ml.failure_pattern_learning import (
     build_failure_patterns,
     learn_failure_pattern,
@@ -27,6 +28,11 @@ PART_HISTORY_PATH = Path("data/part_replacement_history.csv")
 @router.get("/health")
 def api_health() -> dict:
     return {"status": "healthy"}
+
+
+@router.post("/assistant/ask")
+def industrial_assistant(payload: dict) -> dict:
+    return ask_industrial_assistant(payload)
 
 
 @router.post("/machine-health")
