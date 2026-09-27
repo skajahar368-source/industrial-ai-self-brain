@@ -1,6 +1,6 @@
 # Architecture
 
-## V1-V1.5
+## V1-V1.6
 
 Client / Maintenance System / Dashboard
         |
@@ -14,6 +14,7 @@ FastAPI API
         +--> Root-Cause Analysis
         +--> Historical Failure Diagnosis
         +--> Failure Pattern Learning
+        +--> AI Industrial Assistant
         +--> Part Lifecycle Intelligence
         +--> Spare Parts Intelligence
         |
@@ -54,6 +55,12 @@ A replacement warning is triggered when any configured life meter reaches 75% ut
 Self-Brain groups historical breakdowns by machine, cause, fault code, and replaced part. When a new event arrives, it compares the current root-cause evidence with those patterns and produces an evidence-backed confidence score. A strong pattern is a prompt to investigate and verify the cause, not an automatic replacement command.
 
 Verified repair outcomes are stored separately as learning evidence. This lets future versions measure which historical repair patterns actually resolved failures and eventually train supervised failure models when enough labeled data exists.
+
+## AI industrial assistant
+
+The assistant is a grounded orchestration layer over the existing engineering modules. It retrieves the latest machine telemetry, health status, anomaly result, maintenance risk, root-cause evidence, historical failure patterns, and—when requested—part lifecycle and spare inventory context. It does not invent machine facts or issue automatic replacement commands.
+
+The assistant classifies the operator question into an operational intent such as health, diagnosis, history, lifecycle, or spares, then returns both a concise answer and structured evidence for traceability.
 
 ## Closed learning loop
 
