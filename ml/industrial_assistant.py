@@ -12,12 +12,16 @@ from ml.part_lifecycle import active_part_life
 from ml.predictive_maintenance import maintenance_risk
 from ml.root_cause import analyze_root_causes
 from ml.spare_management import analyze_inventory
+from ml.telemetry_ingestion import recent_telemetry
 
 MACHINE_DATA_PATH = Path("data/machine_data.csv")
 SPARES_PATH = Path("data/spare_parts.csv")
 
 
 def _latest_machine_reading(machine_id: str) -> dict[str, Any] | None:
+    live = recent_telemetry(machine_id=machine_id, limit=1)
+    if live:
+        return live[0]
     data = pd.read_csv(MACHINE_DATA_PATH)
     data = data[data["machine_id"].astype(str) == str(machine_id)]
     if data.empty:
