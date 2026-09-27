@@ -58,6 +58,52 @@ def industrial_assistant(payload: dict) -> dict:
     return ask_industrial_assistant(payload)
 
 
+@router.get("/dashboard/overview")
+def dashboard_overview(machine_id: str = "M-001") -> dict:
+    """Return one read-only snapshot for the dashboard control room."""
+    telemetry_records = recent_telemetry(machine_id=machine_id, limit=20)
+    if telemetry_records:
+        latest = telemetry_records[0]
+    else:
+        source = pd.read_csv(DATA_PATH)
+        machine_rows = source[source["machine_id"] == machine_id]
+        if machine_rows.empty:
+            return {"status": "not_found", "machine_id": machine_id}
+        latest = machine_rows.sort_values("timestamp", ascending=False).iloc[0].to_dict()
+
+    health = evaluate_machine_health(latest)
+    risk = maintenance_risk(latest)
+    baseline = pd.read_csv(DATA_PATH)
+    anomaly = detect_anomalies(baseline)
+    machine_anomalies = anomaly[anomaly["machine_id"] == machine_id]
+    latest_anomaly = (
+        machine_anomalies.sort_values("timestamp", ascending=False).iloc[0].to_dict()
+        if not machine_anomalies.empty
+        else {}
+    )
+    root_cause = analyze_root_causes(latest)
+    spare_df = analyze_inventory(pd.read_csv(SPARES_PATH))
+    spare_alerts_df = spare_df[spare_df["status"].isin(["out_of_stock", "reorder", "low"])]
+
+    return {
+        "status": "ok",
+        "machine_id": machine_id,
+        "latest_telemetry": latest,
+        "health": health,
+        "maintenance_risk": risk,
+        "anomaly": {
+            "anomaly_label": latest_anomaly.get("anomaly_label"),
+            "anomaly_score": latest_anomaly.get("anomaly_score"),
+            "status": "anomalous" if latest_anomaly.get("anomaly_label") == -1 else "normal",
+        },
+        "root_cause": root_cause,
+        "spare_alerts": spare_alerts_df[
+            ["spare_id", "part_name", "status", "stock_quantity", "critical", "action"]
+        ].to_dict(orient="records"),
+        "recent_telemetry": telemetry_records[:10],
+    }
+
+
 @router.post("/machine-health")
 def machine_health(payload: dict) -> dict:
     return evaluate_machine_health(payload)
