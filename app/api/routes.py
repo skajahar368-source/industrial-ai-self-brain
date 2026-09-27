@@ -8,6 +8,7 @@ from ml.anomaly_detection import detect_anomalies
 from ml.historical_diagnosis import diagnose_against_history
 from ml.industrial_assistant import ask_industrial_assistant
 from ml.telemetry_ingestion import ingest_batch, ingest_reading, recent_telemetry
+from ml.time_series_intelligence import analyze_trends
 from ml.telemetry_simulator import generate_batch, generate_reading
 from ml.failure_pattern_learning import (
     build_failure_patterns,
@@ -92,6 +93,7 @@ def industrial_assistant(payload: dict) -> dict:
 def dashboard_overview(machine_id: str = "M-001") -> dict:
     """Return one read-only snapshot for the dashboard control room."""
     telemetry_records = recent_telemetry(machine_id=machine_id, limit=20)
+    trend_analysis = analyze_trends(telemetry_records)
     if telemetry_records:
         latest = telemetry_records[0]
     else:
@@ -131,6 +133,7 @@ def dashboard_overview(machine_id: str = "M-001") -> dict:
             ["spare_id", "part_name", "status", "stock_quantity", "critical", "action"]
         ].to_dict(orient="records"),
         "recent_telemetry": telemetry_records[:10],
+        "trend_analysis": trend_analysis,
     }
 
 
