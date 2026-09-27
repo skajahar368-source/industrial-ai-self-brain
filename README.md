@@ -34,6 +34,10 @@ Python, Pandas, NumPy, scikit-learn, FastAPI, SQLite/PostgreSQL-ready architectu
 
 This is a portfolio and engineering prototype. It is not intended to control production equipment without appropriate industrial validation and safety controls.
 
+## V1.7 Real-Time Telemetry Ingestion
+
+The system now has a validated telemetry-ingestion boundary at `POST /api/telemetry/ingest` and batch ingestion at `POST /api/telemetry/ingest-batch`. Events are normalized, validated, timestamped, deduplicated by machine/sequence ID, and stored in the telemetry stream. The AI industrial assistant reads the newest ingested telemetry first and falls back to the sample dataset when no live event exists.
+
 ## V1.6 AI Industrial Assistant
 
 The system now exposes a grounded industrial assistant at `POST /api/assistant/ask`. It combines the latest machine reading with health status, anomaly detection, maintenance risk, root-cause evidence, historical failure patterns, lifecycle data when supplied, and spare information. Responses cite the underlying evidence in the API payload and keep the human maintenance decision final.
