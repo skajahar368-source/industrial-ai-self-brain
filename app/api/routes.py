@@ -11,6 +11,7 @@ from ml.telemetry_ingestion import ingest_batch, ingest_reading, recent_telemetr
 from ml.time_series_intelligence import analyze_trends
 from ml.degradation_timeline import build_degradation_timeline
 from ml.telemetry_simulator import generate_batch, generate_reading
+from ml.failure_prediction_service import predict_latest, train_failure_predictor
 from ml.failure_pattern_learning import (
     build_failure_patterns,
     learn_failure_pattern,
@@ -83,6 +84,19 @@ def telemetry(machine_id: str | None = None, limit: int = 20) -> dict:
     except ValueError as exc:
         return {"status": "rejected", "error": str(exc)}
     return {"count": len(records), "telemetry": records}
+
+
+@router.post("/failure-model/train")
+def failure_model_train() -> dict:
+    try:
+        return train_failure_predictor()
+    except ValueError as exc:
+        return {"status": "rejected", "error": str(exc)}
+
+
+@router.post("/failure-prediction")
+def failure_prediction(payload: dict) -> dict:
+    return predict_latest(payload)
 
 
 @router.post("/assistant/ask")
