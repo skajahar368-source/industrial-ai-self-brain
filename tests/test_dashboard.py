@@ -39,3 +39,10 @@ def test_simulation_batch_endpoint_generates_multiple_readings():
     assert response.status_code == 200
     body = response.json()
     assert body["accepted"] == 3
+
+def test_dashboard_overview_includes_trend_analysis():
+    response = client.get("/api/dashboard/overview?machine_id=M-001")
+    assert response.status_code == 200
+    body = response.json()
+    assert "trend_analysis" in body
+    assert body["trend_analysis"]["status"] in {"ok", "insufficient_data"}
