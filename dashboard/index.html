@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Self-Brain | Industrial AI Dashboard</title>
+<style>
+:root{font-family:Inter,system-ui,sans-serif;background:#0b1020;color:#e8edf7}*{box-sizing:border-box}body{margin:0;background:linear-gradient(135deg,#0b1020,#111a2e);min-height:100vh}header{padding:24px 32px;border-bottom:1px solid #27324a;display:flex;justify-content:space-between;align-items:center}h1{margin:0;font-size:24px}.sub{color:#91a0ba;font-size:13px;margin-top:5px}.badge{padding:7px 12px;border-radius:999px;background:#12351f;color:#6ee7a2;font-size:12px}main{padding:24px 32px;max-width:1400px;margin:auto}.toolbar{display:flex;gap:10px;align-items:center;margin-bottom:20px}select,button,input{background:#151f35;color:#e8edf7;border:1px solid #34415d;border-radius:8px;padding:10px 12px}button{cursor:pointer}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px}.card{background:#11192b;border:1px solid #27324a;border-radius:12px;padding:18px}.label{color:#91a0ba;font-size:12px;text-transform:uppercase;letter-spacing:.06em}.value{font-size:28px;font-weight:700;margin-top:8px}.muted{color:#91a0ba;font-size:12px}.status{display:inline-block;margin-top:10px;padding:5px 9px;border-radius:7px;font-size:12px}.normal{background:#12351f;color:#6ee7a2}.warning{background:#3b2d0e;color:#f6c85f}.critical{background:#401b25;color:#ff879c}.sections{display:grid;grid-template-columns:1.2fr .8fr;gap:14px;margin-top:14px}.list{display:grid;gap:9px;margin-top:14px}.row{display:flex;justify-content:space-between;gap:12px;padding:11px 12px;background:#0d1525;border-radius:8px;border:1px solid #202b42}table{width:100%;border-collapse:collapse;margin-top:14px;font-size:13px}th,td{text-align:left;padding:9px;border-bottom:1px solid #263149}th{color:#91a0ba;font-weight:500}.chat{display:flex;gap:8px;margin-top:12px}.chat input{flex:1}.small{font-size:11px;color:#73829d}.empty{color:#91a0ba;padding:15px 0}@media(max-width:900px){.grid{grid-template-columns:repeat(2,1fr)}.sections{grid-template-columns:1fr}}@media(max-width:600px){header,main{padding:18px}.grid{grid-template-columns:1fr}}
+</style></head>
+<body>
+<header><div><h1>Industrial AI — Self-Brain</h1><div class="sub">Machine health & predictive-maintenance control room</div></div><div class="badge" id="connection">● Checking API</div></header>
+<main>
+<div class="toolbar"><label>Machine</label><select id="machine"><option>M-001</option><option>M-002</option><option>M-003</option></select><button onclick="refresh()">Refresh</button><span class="small" id="updated"></span></div>
+<div class="grid">
+<div class="card"><div class="label">Health</div><div class="value" id="health">—</div><div id="healthStatus" class="status">Loading</div></div>
+<div class="card"><div class="label">Temperature</div><div class="value" id="temp">—</div><div class="muted">°C</div></div>
+<div class="card"><div class="label">Vibration</div><div class="value" id="vibration">—</div><div class="muted">mm/s</div></div>
+<div class="card"><div class="label">Pressure</div><div class="value" id="pressure">—</div><div class="muted">bar</div></div>
+</div>
+<div class="sections">
+<section class="card"><div class="label">Maintenance intelligence</div><div class="list" id="intelligence"></div></section>
+<section class="card"><div class="label">Spare alerts</div><div class="list" id="spares"></div></section>
+</div>
+<section class="card" style="margin-top:14px"><div class="label">Recent telemetry</div><table><thead><tr><th>Time</th><th>Temperature</th><th>Pressure</th><th>Vibration</th><th>Downtime</th><th>Fault</th></tr></thead><tbody id="telemetry"></tbody></table></section>
+<section class="card" style="margin-top:14px"><div class="label">AI Industrial Assistant</div><div class="chat"><input id="question" value="What is the current machine condition?"><button onclick="ask()">Ask</button></div><div id="assistantAnswer"></div></section>
+</main>
+<script>
+const api=location.origin+"/api",$=id=>document.getElementById(id);
+async function get(path,options){const r=await fetch(api+path,options);if(!r.ok)throw new Error("API "+r.status);return r.json()}
+function setStatus(el,text,type){el.textContent=text;el.className="status "+type}
+async function refresh(){
+ const machine=$("machine").value;
+ try{
+  await get("/health");$("connection").textContent="● API Connected";
+  const t=await get("/telemetry?machine_id="+encodeURIComponent(machine)+"&limit=10");
+  const latest=(t.telemetry||[])[0];
+  if(!latest){$("health").textContent="No data";setStatus($("healthStatus"),"No telemetry","warning");return}
+  const [h,risk,spares]=await Promise.all([
+   get("/machine-health",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(latest)}),
+   get("/maintenance-risk"),
+   get("/spares/alerts")
+  ]);
+  $("temp").textContent=Number(latest.temperature_c).toFixed(1);$("pressure").textContent=Number(latest.pressure_bar).toFixed(1);$("vibration").textContent=Number(latest.vibration_mm_s).toFixed(1);
+  $("health").textContent=h.status||"—";setStatus($("healthStatus"),h.status||"Unknown",(h.status==="critical"||h.status==="high")?"critical":h.status==="warning"?"warning":"normal");
+  const rows=(risk.maintenance_risk||[]).filter(x=>x.machine_id===machine).slice(-5).reverse();
+  $("intelligence").innerHTML=rows.length?rows.map(x=>'<div class="row"><span>Maintenance risk</span><strong>'+Number(x.maintenance_risk_score).toFixed(0)+'/100 · '+x.risk_level+'</strong></div>').join(""):'<div class="empty">No historical risk data.</div>';
+  $("spares").innerHTML=(spares.alerts||[]).length?spares.alerts.slice(0,6).map(x=>'<div class="row"><span>'+x.part_name+'</span><strong>'+x.status+'</strong></div>').join(""):'<div class="empty">No spare alerts.</div>';
+  $("telemetry").innerHTML=(t.telemetry||[]).map(x=>'<tr><td>'+String(x.timestamp).replace("T"," ").slice(0,19)+'</td><td>'+x.temperature_c+'</td><td>'+x.pressure_bar+'</td><td>'+x.vibration_mm_s+'</td><td>'+x.downtime_minutes+'</td><td>'+x.fault_code+'</td></tr>').join("");
+  $("updated").textContent="Updated "+new Date().toLocaleTimeString();
+ }catch(e){$("connection").textContent="● API Error";$("connection").style.background="#401b25";$("updated").textContent=e.message}
+}
+async function ask(){const machine=$("machine").value,q=$("question").value;$("assistantAnswer").textContent="Thinking…";try{const r=await get("/assistant/ask",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({machine_id:machine,question:q})});$("assistantAnswer").textContent=r.answer||JSON.stringify(r)}catch(e){$("assistantAnswer").textContent="Assistant error: "+e.message}}
+$("machine").addEventListener("change",refresh);refresh();setInterval(refresh,30000);
+</script></body></html>
