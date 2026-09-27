@@ -53,3 +53,30 @@ def test_dashboard_overview_includes_degradation_timeline():
     body = response.json()
     assert "degradation_timeline" in body
     assert body["degradation_timeline"]["status"] in {"ok", "insufficient_data"}
+
+def test_failure_model_train_endpoint():
+    response = client.post("/api/failure-model/train")
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "trained"
+    assert "metrics" in body
+    assert body["training_samples"] >= 1
+
+
+def test_failure_prediction_endpoint_requires_training_or_predicts():
+    client.post("/api/failure-model/train")
+    response = client.post(
+        "/api/failure-prediction",
+        json={
+            "temperature_c": 82,
+            "pressure_bar": 101,
+            "vibration_mm_s": 8.4,
+            "cycle_count": 1450,
+            "downtime_minutes": 35,
+        },
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "predicted"
+    assert 0 <= body["failure_probability"] <= 1
+    assert body["human_decision_required"] is True
