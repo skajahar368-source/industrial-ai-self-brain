@@ -8,6 +8,7 @@ from ml.anomaly_detection import detect_anomalies
 from ml.historical_diagnosis import diagnose_against_history
 from ml.industrial_assistant import ask_industrial_assistant
 from ml.telemetry_ingestion import ingest_batch, ingest_reading, recent_telemetry
+from ml.telemetry_simulator import generate_batch, generate_reading
 from ml.failure_pattern_learning import (
     build_failure_patterns,
     learn_failure_pattern,
@@ -42,6 +43,35 @@ def telemetry_ingest(payload: dict) -> dict:
 @router.post("/telemetry/ingest-batch")
 def telemetry_ingest_batch(payload: list[dict]) -> dict:
     return ingest_batch(payload)
+
+
+@router.post("/telemetry/simulate")
+def telemetry_simulate(payload: dict) -> dict:
+    try:
+        reading = generate_reading(
+            machine_id=str(payload.get("machine_id", "M-001")),
+            step=int(payload.get("step", 0)),
+            scenario=str(payload.get("scenario", "normal")),
+            interval_seconds=int(payload.get("interval_seconds", 5)),
+        )
+        return ingest_reading(reading)
+    except (TypeError, ValueError) as exc:
+        return {"status": "rejected", "error": str(exc)}
+
+
+@router.post("/telemetry/simulate-batch")
+def telemetry_simulate_batch(payload: dict) -> dict:
+    try:
+        readings = generate_batch(
+            machine_id=str(payload.get("machine_id", "M-001")),
+            start_step=int(payload.get("start_step", 0)),
+            count=int(payload.get("count", 10)),
+            scenario=str(payload.get("scenario", "normal")),
+            interval_seconds=int(payload.get("interval_seconds", 5)),
+        )
+        return ingest_batch(readings)
+    except (TypeError, ValueError) as exc:
+        return {"status": "rejected", "error": str(exc)}
 
 
 @router.get("/telemetry")
