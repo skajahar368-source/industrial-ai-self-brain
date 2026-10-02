@@ -9,6 +9,7 @@ from ml.degradation_timeline import build_degradation_timeline
 from ml.predictive_maintenance import maintenance_risk
 from ml.root_cause import analyze_root_causes
 from ml.telemetry_ingestion import normalize_reading
+from ml.telemetry_quality import assess_telemetry_quality
 from ml.time_series_intelligence import analyze_trends
 
 
@@ -103,6 +104,39 @@ def _pipeline_case(name: str, readings: list[dict[str, Any]]) -> dict[str, Any]:
     }
 
 
+def _quality_case() -> dict[str, Any]:
+    readings = [
+        _reading(
+            timestamp="2026-09-27T09:58:00+00:00",
+            temperature_c=60.0,
+        ),
+        _reading(
+            timestamp="2026-09-27T10:00:00+00:00",
+            temperature_c=85.0,
+        ),
+        _reading(
+            timestamp="2026-09-27T10:00:05+00:00",
+            temperature_c=85.0,
+        ),
+    ]
+    quality = assess_telemetry_quality(
+        readings,
+        reference_time="2026-09-27T10:00:05+00:00",
+        stale_after_seconds=60,
+        stuck_window=2,
+    )
+    issue_types = {issue["type"] for issue in quality["issues"]}
+    required = {"sudden_spike", "stuck_sensor"}
+    passed = quality["quality"] == "degraded" and required.issubset(issue_types)
+    return {
+        "name": "telemetry_quality",
+        "category": "telemetry_quality",
+        "status": "passed" if passed else "failed",
+        "expected": sorted(required),
+        "actual": sorted(issue_types),
+    }
+
+
 def run_validation_suite() -> dict[str, Any]:
     cases = [
         _case("normal_baseline", _reading(), "normal"),
@@ -135,6 +169,7 @@ def run_validation_suite() -> dict[str, Any]:
             {key: value for key, value in _reading().items() if key != "vibration_mm_s"},
             expected_rejection=True,
         ),
+        _quality_case(),
         _pipeline_case(
             "degradation_trend_and_root_cause",
             [
