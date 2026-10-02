@@ -54,10 +54,24 @@ The system is intentionally **decision-support software**. Human maintenance per
 
 ### Dashboard
 A read-only industrial control-room dashboard is available from the FastAPI application. It displays current health, maintenance risk, anomaly status, recent telemetry, trend/degradation information, spare alerts, and the industrial assistant.
-\n### Validation Center\nThe read-only validation endpoint `GET /api/validation/run` runs deterministic software checks for a normal baseline, high temperature, high pressure, high vibration, combined failure conditions, negative values, invalid timestamps, and missing required telemetry. It reports passed/failed cases without writing telemetry to the stream.\n
+
+### Validation Center
+The read-only endpoint `GET /api/validation/run` runs deterministic software checks without storing telemetry. The current suite covers:
+- normal baseline;
+- high temperature;
+- high pressure;
+- high vibration;
+- combined failure;
+- negative physical values;
+- invalid timestamps;
+- missing required telemetry;
+- multi-step deterioration with trend, degradation, and root-cause checks.
+
+The validation contract distinguishes an expected rejection from an unexpected `ValueError`, so invalid-input tests cannot pass merely because an exception occurred.
+
 ## Validation status
 
-The project currently has an automated end-to-end validation path covering:
+The project has an automated end-to-end validation path covering:
 
 1. Simulated normal telemetry
 2. Simulated warning telemetry
