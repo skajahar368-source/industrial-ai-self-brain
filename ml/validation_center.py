@@ -2,9 +2,15 @@ from __future__ import annotations
 
 from typing import Any
 
+import pandas as pd
+
 from app.services.health import evaluate_machine_health
+from ml.degradation_timeline import build_degradation_timeline
 from ml.predictive_maintenance import maintenance_risk
+from ml.root_cause import analyze_root_causes
 from ml.telemetry_ingestion import normalize_reading
+from ml.time_series_intelligence import analyze_trends
+
 
 BASE_READING: dict[str, Any] = {
     "timestamp": "2026-09-27T10:00:00+00:00",
@@ -27,33 +33,74 @@ def _case(
     name: str,
     payload: dict[str, Any],
     expected_status: str | None = None,
+    expected_rejection: bool = False,
 ) -> dict[str, Any]:
     try:
         normalized = normalize_reading(payload)
-        health = evaluate_machine_health(normalized)
-        risk = maintenance_risk(normalized)
-        passed = expected_status is None or health["status"] == expected_status
-        return {
-            "name": name,
-            "category": "telemetry_behavior",
-            "status": "passed" if passed else "failed",
-            "expected_health": expected_status,
-            "actual_health": health["status"],
-            "maintenance_risk": risk["risk_level"],
-            "details": {
-                "health": health,
-                "maintenance_risk": risk,
-            },
-        }
     except ValueError as exc:
+        passed = expected_rejection
         return {
             "name": name,
             "category": "telemetry_contract",
-            "status": "passed",
-            "expected": "rejected",
+            "status": "passed" if passed else "failed",
+            "expected": "rejected" if expected_rejection else "accepted",
             "actual": "rejected",
             "error": str(exc),
         }
+
+    if expected_rejection:
+        return {
+            "name": name,
+            "category": "telemetry_contract",
+            "status": "failed",
+            "expected": "rejected",
+            "actual": "accepted",
+        }
+
+    health = evaluate_machine_health(normalized)
+    risk = maintenance_risk(normalized)
+    passed = expected_status is None or health["status"] == expected_status
+    return {
+        "name": name,
+        "category": "telemetry_behavior",
+        "status": "passed" if passed else "failed",
+        "expected_health": expected_status,
+        "actual_health": health["status"],
+        "maintenance_risk": risk["risk_level"],
+        "details": {
+            "health": health,
+            "maintenance_risk": risk,
+        },
+    }
+
+
+def _pipeline_case(name: str, readings: list[dict[str, Any]]) -> dict[str, Any]:
+    normalized = [normalize_reading(item) for item in readings]
+    trend = analyze_trends(normalized)
+    degradation = build_degradation_timeline(normalized)
+    root_cause = analyze_root_causes(normalized[-1])
+    passed = (
+        trend["trend"] == "deteriorating"
+        and degradation["direction"] in {"deteriorating", "rapid_deterioration"}
+        and root_cause["cause_count"] >= 1
+    )
+    return {
+        "name": name,
+        "category": "intelligence_pipeline",
+        "status": "passed" if passed else "failed",
+        "expected": {
+            "trend": "deteriorating",
+            "degradation_direction": "deteriorating_or_rapid_deterioration",
+            "root_cause_count": ">=1",
+        },
+        "actual": {
+            "trend": trend["trend"],
+            "signals": trend["signals"],
+            "degradation_direction": degradation["direction"],
+            "risk_change": degradation["risk_change"],
+            "root_cause_count": root_cause["cause_count"],
+        },
+    }
 
 
 def run_validation_suite() -> dict[str, Any]:
@@ -76,14 +123,42 @@ def run_validation_suite() -> dict[str, Any]:
         _case(
             "negative_temperature_rejected",
             _reading(temperature_c=-1.0),
+            expected_rejection=True,
         ),
         _case(
             "invalid_timestamp_rejected",
             _reading(timestamp="not-a-timestamp"),
+            expected_rejection=True,
         ),
         _case(
             "missing_required_sensor_rejected",
             {key: value for key, value in _reading().items() if key != "vibration_mm_s"},
+            expected_rejection=True,
+        ),
+        _pipeline_case(
+            "degradation_trend_and_root_cause",
+            [
+                _reading(
+                    timestamp="2026-09-27T10:00:00+00:00",
+                    temperature_c=60.0,
+                    vibration_mm_s=3.0,
+                    pressure_bar=55.0,
+                ),
+                _reading(
+                    timestamp="2026-09-27T10:01:00+00:00",
+                    temperature_c=70.0,
+                    vibration_mm_s=5.0,
+                    pressure_bar=65.0,
+                ),
+                _reading(
+                    timestamp="2026-09-27T10:02:00+00:00",
+                    temperature_c=84.0,
+                    vibration_mm_s=8.5,
+                    pressure_bar=105.0,
+                    downtime_minutes=30.0,
+                    fault_code="MULTI_FAULT",
+                ),
+            ],
         ),
     ]
 
