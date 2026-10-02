@@ -27,6 +27,7 @@ The system is intentionally **decision-support software**. Human maintenance per
 - Batch ingestion at `POST /api/telemetry/ingest-batch`
 - Validation, normalization, UTC timestamps, and duplicate protection
 - Deterministic machine telemetry simulation for controlled testing
+- Telemetry quality analysis at `POST /api/telemetry/quality` for stale readings, stuck sensors, missing sensor fields, and sudden sensor spikes
 
 ### Machine intelligence
 - Rule-based machine health evaluation
@@ -66,6 +67,8 @@ The read-only endpoint `GET /api/validation/run` runs deterministic software che
 - invalid timestamps;
 - missing required telemetry;
 - multi-step deterioration with trend, degradation, and root-cause checks.
+
+Telemetry quality checks are intentionally separated from machine-health scoring so poor sensor data can be identified before it is treated as a machine condition.
 
 The validation contract distinguishes an expected rejection from an unexpected `ValueError`, so invalid-input tests cannot pass merely because an exception occurred.
 
