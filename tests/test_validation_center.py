@@ -9,7 +9,7 @@ client = TestClient(app)
 def test_validation_suite_passes_without_writing_telemetry():
     result = run_validation_suite()
     assert result["status"] == "passed"
-    assert result["total_cases"] == 9
+    assert result["total_cases"] == 10
     assert result["failed"] == 0
 
 
@@ -23,6 +23,15 @@ def test_validation_suite_covers_combined_failure_and_invalid_inputs():
     assert cases["negative_temperature_rejected"]["status"] == "passed"
     assert cases["invalid_timestamp_rejected"]["status"] == "passed"
     assert cases["missing_required_sensor_rejected"]["status"] == "passed"
+
+
+def test_validation_suite_covers_telemetry_quality():
+    result = run_validation_suite()
+    case = next(item for item in result["cases"] if item["name"] == "telemetry_quality")
+
+    assert case["status"] == "passed"
+    assert "sudden_spike" in case["actual"]
+    assert "stuck_sensor" in case["actual"]
 
 
 def test_validation_suite_covers_trend_degradation_and_root_cause():
