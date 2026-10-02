@@ -8,6 +8,7 @@ from ml.anomaly_detection import detect_anomalies
 from ml.historical_diagnosis import diagnose_against_history
 from ml.industrial_assistant import ask_industrial_assistant
 from ml.telemetry_ingestion import ingest_batch, ingest_reading, recent_telemetry
+from ml.telemetry_quality import assess_telemetry_quality
 from ml.time_series_intelligence import analyze_trends
 from ml.validation_center import run_validation_suite
 from ml.degradation_timeline import build_degradation_timeline
@@ -34,6 +35,23 @@ PART_HISTORY_PATH = Path("data/part_replacement_history.csv")
 @router.get("/health")
 def api_health() -> dict:
     return {"status": "healthy"}
+
+
+@router.post("/telemetry/quality")
+def telemetry_quality(payload: dict) -> dict:
+    readings = payload.get("readings", [])
+    if not isinstance(readings, list):
+        return {"status": "rejected", "error": "readings must be a list"}
+    try:
+        return assess_telemetry_quality(
+            readings,
+            reference_time=payload.get("reference_time"),
+            stale_after_seconds=int(payload.get("stale_after_seconds", 60)),
+            stuck_window=int(payload.get("stuck_window", 3)),
+            spike_thresholds=payload.get("spike_thresholds"),
+        )
+    except (TypeError, ValueError) as exc:
+        return {"status": "rejected", "error": str(exc)}
 
 
 @router.post("/telemetry/ingest")
