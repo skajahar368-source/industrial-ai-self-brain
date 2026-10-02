@@ -66,6 +66,7 @@ The read-only endpoint `GET /api/validation/run` runs deterministic software che
 - negative physical values;
 - invalid timestamps;
 - missing required telemetry;
+- telemetry-quality validation for sudden spikes and stuck sensors;
 - multi-step deterioration with trend, degradation, and root-cause checks.
 
 Telemetry quality checks are intentionally separated from machine-health scoring so poor sensor data can be identified before it is treated as a machine condition.
