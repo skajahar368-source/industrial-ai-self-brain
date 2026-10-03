@@ -47,7 +47,7 @@ The system is intentionally **decision-support software**. Human maintenance per
 - Failure-risk prediction with an explicit human-decision requirement
 - Model warning that representative labeled machine history is required before operational use
 
-### Industrial maintenance intelligence
+### Machine maintenance intelligence
 - Part lifecycle tracking
 - Part replacement workflow validation
 - Spare inventory and reorder alerts
@@ -55,6 +55,14 @@ The system is intentionally **decision-support software**. Human maintenance per
 
 ### Dashboard
 A read-only industrial control-room dashboard is available from the FastAPI application. It displays current health, maintenance risk, anomaly status, recent telemetry, trend/degradation information, spare alerts, and the industrial assistant.
+
+### Self-Brain ML layer
+- Machine-focused synthetic run-to-failure training data using the existing telemetry schema
+- Windowed telemetry features for temperature, pressure, vibration, downtime, and cycle behavior
+- Isolation Forest anomaly detection, Random Forest machine-fault classification, and prototype RUL estimation
+- Explicit synthetic-data provenance; evaluation metrics are not real-machine accuracy
+- API endpoints: `POST /api/self-brain/train`, `GET /api/self-brain/status`, and `POST /api/self-brain/diagnose`
+- Human maintenance decision remains mandatory
 
 ### Validation Center
 The read-only endpoint `GET /api/validation/run` runs deterministic software checks without storing telemetry. The current suite covers:
@@ -99,10 +107,10 @@ The CI workflow runs the complete pytest suite on Python 3.11.
 ## Validation-first roadmap
 
 - **Validation Center:** deliberately test normal, warning, failure, missing, duplicate, invalid, stale, and contradictory telemetry.
-- **V2.4:** advanced root-cause correlation after validation gaps are understood.
-- **V2.5:** continuous learning using verified maintenance outcomes.
+- **V2.4:** integrate Self-Brain ML with telemetry-quality confidence and machine-specific baselines.
+- **V2.5:** continuous learning using verified maintenance outcomes and failure history.
 - **V3.x:** production-style deployment and real industrial data integration.
-- **Future:** PLC/SCADA/OPC-UA/MQTT/IIoT integrations, multi-machine intelligence, RUL, MLOps, explainability, and digital-twin workflows.
+- **Future:** PLC/SCADA/OPC-UA/MQTT/IIoT integrations, multi-machine intelligence, stronger RUL models, MLOps, explainability, and digital-twin workflows.
 
 ## Testing
 
