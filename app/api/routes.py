@@ -24,7 +24,10 @@ from ml.part_lifecycle import active_part_life
 from ml.predictive_maintenance import maintenance_risk, score_dataframe
 from ml.replacement_workflow import validate_early_replacement
 from ml.root_cause import analyze_root_causes
-from ml.spare_management import analyze_inventory, spare_status\nfrom ml.self_brain_ml import SelfBrainML\n\n_SELF_BRAIN: SelfBrainML | None = None
+from ml.spare_management import analyze_inventory, spare_status
+from ml.self_brain_ml import SelfBrainML
+
+_SELF_BRAIN: SelfBrainML | None = None
 
 router = APIRouter(prefix="/api")
 DATA_PATH = Path("data/machine_data.csv")
