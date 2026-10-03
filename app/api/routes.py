@@ -330,3 +330,52 @@ def spare_alerts() -> dict:
 @router.post("/spares/recommendation")
 def spare_recommendation(payload: dict) -> dict:
     return spare_status(payload)
+
+
+@router.post("/self-brain/train")
+def self_brain_train() -> dict:
+    global _SELF_BRAIN
+    try:
+        _SELF_BRAIN = SelfBrainML()
+        metrics = _SELF_BRAIN.train()
+        return {"status": "trained", "model": "machine_self_brain", "metrics": metrics}
+    except (TypeError, ValueError) as exc:
+        _SELF_BRAIN = None
+        return {"status": "rejected", "error": str(exc)}
+
+
+@router.get("/self-brain/status")
+def self_brain_status() -> dict:
+    if _SELF_BRAIN is None:
+        return {"trained": False, "metrics": None}
+    return _SELF_BRAIN.status()
+
+
+@router.post("/self-brain/diagnose")
+def self_brain_diagnose(payload: dict) -> dict:
+    global _SELF_BRAIN
+    readings = payload.get("readings", [])
+    if not isinstance(readings, list):
+        return {"status": "rejected", "error": "readings must be a list"}
+    try:
+        quality = assess_telemetry_quality(
+            readings,
+            reference_time=payload.get("reference_time"),
+            stale_after_seconds=int(payload.get("stale_after_seconds", 60)),
+        )
+        blocking = {"invalid_timestamp", "missing_sensor"}
+        blocking_issues = [issue for issue in quality["issues"] if issue["type"] in blocking]
+        if blocking_issues:
+            return {
+                "status": "rejected",
+                "reason": "telemetry_quality",
+                "quality": quality,
+            }
+        if _SELF_BRAIN is None:
+            _SELF_BRAIN = SelfBrainML()
+            _SELF_BRAIN.train()
+        result = _SELF_BRAIN.diagnose(readings, machine_id=payload.get("machine_id"))
+        result["telemetry_quality"] = quality
+        return result
+    except (TypeError, ValueError) as exc:
+        return {"status": "rejected", "error": str(exc)}
