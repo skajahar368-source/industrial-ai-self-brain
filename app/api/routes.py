@@ -94,6 +94,51 @@ def plc_scan(payload: dict) -> dict:
         return {"status": "rejected", "error": str(exc)}
 
 
+@router.post("/simulator/demo")
+def simulator_demo(payload: dict) -> dict:
+    """Run a complete virtual-machine degradation demo through the PLC gateway."""
+    global _SELF_BRAIN
+    try:
+        machine_id = str(payload.get("machine_id", "M-DEMO")).strip()
+        scenario = str(payload.get("scenario", "thermal")).strip().lower()
+        count = int(payload.get("count", 24))
+        if count < 12 or count > 120:
+            raise ValueError("count must be between 12 and 120")
+        gateway = _get_plc_gateway(machine_id=machine_id, scenario=scenario)
+        scans = []
+        for _ in range(count):
+            scans.append(gateway.scan())
+        readings = recent_telemetry(machine_id=machine_id, limit=count)
+        latest = readings[0]
+        health = evaluate_machine_health(latest)
+        quality = assess_telemetry_quality(readings, stale_after_seconds=60)
+        risk = maintenance_risk(latest)
+        root_cause = analyze_root_causes(latest)
+        if _SELF_BRAIN is None:
+            _SELF_BRAIN = SelfBrainML()
+            _SELF_BRAIN.train()
+        brain = _SELF_BRAIN.diagnose(readings, machine_id=machine_id)
+        return {
+            "status": "ok",
+            "demo": {
+                "machine_id": machine_id,
+                "scenario": scenario,
+                "samples": len(readings),
+                "description": "Synthetic degradation run through the VirtualPLC and read-only gateway.",
+            },
+            "plc": scans[-1]["plc"],
+            "latest_telemetry": latest,
+            "telemetry_quality": quality,
+            "health": health,
+            "maintenance_risk": risk,
+            "root_cause": root_cause,
+            "brain": brain,
+            "control_write_performed": False,
+        }
+    except (TypeError, ValueError) as exc:
+        return {"status": "rejected", "error": str(exc)}
+
+
 @router.post("/gateway/scan")
 def gateway_scan(payload: dict) -> dict:
     """Read PLC -> ingest telemetry -> run Self-Brain decision support.

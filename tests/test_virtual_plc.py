@@ -15,7 +15,7 @@ def test_virtual_plc_exposes_machine_tags_without_control_writes():
 
 
 def test_virtual_plc_failure_scenario_sets_alarm():
-    plc = VirtualPLC("M-FAIL", "failure")
+    plc = VirtualPLC("M-FAIL", "combined")
     snapshot = plc.scan()
 
     assert snapshot["state"] == "FAULT"
@@ -32,3 +32,11 @@ def test_gateway_maps_plc_registers_to_normalized_telemetry():
     assert telemetry["source"] == "virtual-plc-gateway"
     assert telemetry["temperature_c"] == snapshot["motor_temperature_c"]
     assert telemetry["sequence_id"] == "PLC-M-GATE-1"
+
+
+def test_virtual_plc_supports_specific_fault_modes():
+    for scenario in ("thermal", "pressure", "vibration", "combined"):
+        plc = VirtualPLC(f"M-{scenario}", scenario)
+        snapshot = plc.scan()
+        assert snapshot["scenario"] == scenario
+        assert snapshot["fault_code"] != "NONE"

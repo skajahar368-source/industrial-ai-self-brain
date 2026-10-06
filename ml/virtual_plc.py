@@ -46,8 +46,8 @@ class VirtualPLC:
     def configure(self, *, scenario: str | None = None, mode: str | None = None) -> dict[str, Any]:
         if scenario is not None:
             scenario = str(scenario).strip().lower()
-            if scenario not in {"normal", "warning", "failure"}:
-                raise ValueError("scenario must be one of: ['failure', 'normal', 'warning']")
+            if scenario not in {"normal", "thermal", "pressure", "vibration", "combined"}:
+                raise ValueError("scenario must be one of: ['combined', 'normal', 'pressure', 'thermal', 'vibration']")
             self.scenario = scenario
         if mode is not None:
             mode = str(mode).strip().upper()
@@ -73,7 +73,7 @@ class VirtualPLC:
         self.registers.downtime_minutes = float(reading["downtime_minutes"])
         self.registers.fault_code = str(reading["fault_code"])
         self.registers.alarm_active = self.registers.fault_code != "NONE"
-        self.registers.state = "FAULT" if self.scenario == "failure" else "RUNNING"
+        self.registers.state = "FAULT" if self.scenario != "normal" and self.registers.alarm_active else "RUNNING"
         return self.snapshot()
 
     def snapshot(self) -> dict[str, Any]:

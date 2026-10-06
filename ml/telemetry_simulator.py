@@ -3,16 +3,11 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-SCENARIOS = {"normal", "warning", "failure"}
+SCENARIOS = {"normal", "thermal", "pressure", "vibration", "combined"}
 
 
-def generate_reading(
-    machine_id: str = "M-001",
-    step: int = 0,
-    scenario: str = "normal",
-    interval_seconds: int = 5,
-) -> dict[str, Any]:
-    """Generate deterministic machine telemetry for controlled simulation."""
+def generate_reading(machine_id: str = "M-001", step: int = 0, scenario: str = "normal", interval_seconds: int = 5) -> dict[str, Any]:
+    """Generate deterministic industrial telemetry for controlled fault injection."""
     scenario = scenario.lower().strip()
     if scenario not in SCENARIOS:
         raise ValueError(f"scenario must be one of: {sorted(SCENARIOS)}")
@@ -21,25 +16,42 @@ def generate_reading(
     if interval_seconds < 1:
         raise ValueError("interval_seconds must be positive")
 
-    progress = min(step, 20)
+    progress = min(step, 40)
+    base_temperature = 61.0 + 0.12 * progress
+    base_pressure = 52.0 + 0.08 * progress
+    base_vibration = 2.8 + 0.04 * progress
+    downtime = 0.0
+    fault = "NONE"
+
     if scenario == "normal":
-        temperature = 61.0 + 0.15 * progress
-        pressure = 52.0 + 0.1 * progress
-        vibration = 2.8 + 0.05 * progress
-        downtime = 0.0
-        fault = "NONE"
-    elif scenario == "warning":
-        temperature = 65.0 + 0.8 * progress
-        pressure = 55.0 + 0.2 * progress
-        vibration = 4.5 + 0.3 * progress
-        downtime = min(15.0, 1.0 + progress * 0.7)
-        fault = "WARN_TEMP" if progress < 12 else "HIGH_TEMP"
+        temperature, pressure, vibration = base_temperature, base_pressure, base_vibration
+    elif scenario == "thermal":
+        severity = max(0, progress - 5)
+        temperature = base_temperature + 0.95 * severity
+        pressure, vibration = base_pressure, base_vibration
+        downtime = min(30.0, severity * 0.45)
+        fault = "THERMAL_DEGRADATION" if severity < 15 else "HIGH_TEMP"
+    elif scenario == "pressure":
+        severity = max(0, progress - 5)
+        temperature = base_temperature + 0.15 * severity
+        pressure = base_pressure + 1.65 * severity
+        vibration = base_vibration + 0.08 * severity
+        downtime = min(30.0, severity * 0.5)
+        fault = "PRESSURE_DEGRADATION" if severity < 18 else "HIGH_PRESSURE"
+    elif scenario == "vibration":
+        severity = max(0, progress - 5)
+        temperature = base_temperature + 0.25 * severity
+        pressure = base_pressure
+        vibration = base_vibration + 0.42 * severity
+        downtime = min(30.0, severity * 0.6)
+        fault = "VIBRATION_DEGRADATION" if severity < 12 else "HIGH_VIBRATION"
     else:
-        temperature = 80.0 + 0.35 * progress
-        pressure = 100.0 + 0.25 * progress
-        vibration = 8.0 + 0.2 * progress
-        downtime = min(60.0, 20.0 + progress * 1.5)
-        fault = "HIGH_TEMP_PRESSURE"
+        severity = max(0, progress - 5)
+        temperature = base_temperature + 0.65 * severity
+        pressure = base_pressure + 1.1 * severity
+        vibration = base_vibration + 0.32 * severity
+        downtime = min(60.0, severity * 1.1)
+        fault = "COMBINED_DEGRADATION" if severity < 12 else "MULTI_PARAMETER_FAULT"
 
     timestamp = datetime.now(timezone.utc) + timedelta(seconds=step * interval_seconds)
     return {
@@ -56,21 +68,7 @@ def generate_reading(
     }
 
 
-def generate_batch(
-    machine_id: str = "M-001",
-    start_step: int = 0,
-    count: int = 10,
-    scenario: str = "normal",
-    interval_seconds: int = 5,
-) -> list[dict[str, Any]]:
+def generate_batch(machine_id: str = "M-001", start_step: int = 0, count: int = 10, scenario: str = "normal", interval_seconds: int = 5) -> list[dict[str, Any]]:
     if count < 1 or count > 500:
         raise ValueError("count must be between 1 and 500")
-    return [
-        generate_reading(
-            machine_id=machine_id,
-            step=start_step + offset,
-            scenario=scenario,
-            interval_seconds=interval_seconds,
-        )
-        for offset in range(count)
-    ]
+    return [generate_reading(machine_id, start_step + offset, scenario, interval_seconds) for offset in range(count)]
