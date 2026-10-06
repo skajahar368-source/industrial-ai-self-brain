@@ -80,3 +80,31 @@ The system should not automatically replace a part. It should provide evidence:
 "Cooling Fan CF-24: 91% runtime life used, 78% production life used, 52% calendar life used. Runtime is the limiting meter. Inspect and plan replacement."
 
 A human maintenance decision remains the final action.
+
+
+## V1.8 virtual PLC and gateway
+
+For development without physical equipment, the project now includes a vendor-neutral
+VirtualPLC and PLCGateway:
+
+Virtual PLC tags
+        |
+        v
+PLC Gateway / normalized telemetry
+        |
+        v
+Telemetry ingestion
+        |
+        +--> Health + maintenance risk
+        +--> Self-Brain ML
+        |
+        v
+Read-only dashboard / operator decision support
+
+The gateway exposes a stable boundary for future PLC adapters. A real adapter can later
+map OPC UA, Modbus, MQTT, or a manufacturer-specific gateway into the same normalized
+telemetry contract.
+
+The current VirtualPLC intentionally has no control-write API. Self-Brain can read and
+analyze the simulated PLC state, but it cannot start, stop, reset, or otherwise command
+the simulated or real machine through this interface.

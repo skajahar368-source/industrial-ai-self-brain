@@ -10,7 +10,7 @@ def test_self_brain_api_trains_and_reports_status():
 
 
 def test_self_brain_api_rejects_missing_sensor_before_model():
-    readings = simulate_machine("M-API", np.random.default_rng(2), n_steps=20).to_dict("records")
+    readings = simulate_machine("M-API", np.random.default_rng(2), n_steps=24).to_dict("records")
     readings[-1].pop("temperature_c")
     result = self_brain_diagnose({"readings": readings, "reference_time": "2026-01-01T00:02:00+00:00"})
     assert result["status"] == "rejected"

@@ -126,3 +126,22 @@ GitHub Actions runs the same test suite on pushes to `main` and pull requests.
 ## Safety
 
 This is a portfolio and engineering prototype. It must not directly control production equipment without appropriate industrial validation, cybersecurity controls, safety systems, and qualified engineering review.
+
+
+## V1.8 PLC-to-Self-Brain prototype
+
+The first end-to-end industrial data path is now implemented:
+
+**Virtual PLC → PLC Gateway → Telemetry API → Health/Risk → Self-Brain ML**
+
+New read-only/development endpoints:
+- `GET /api/plc/status`
+- `POST /api/plc/configure`
+- `POST /api/plc/scan`
+- `POST /api/gateway/scan`
+
+`/api/gateway/scan` performs one simulated PLC scan, normalizes and ingests the
+telemetry, evaluates machine health and maintenance risk, and—after the ML window
+has warmed up—runs the existing Self-Brain diagnosis.
+
+No PLC control write is performed. The prototype remains advisory and simulation-only.
