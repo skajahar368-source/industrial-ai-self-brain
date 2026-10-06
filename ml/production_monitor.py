@@ -72,3 +72,33 @@ def summarize_production(
         downtime_minutes=downtime_minutes,
         ideal_cycle_seconds=ideal_cycle_seconds,
     ).metrics()
+
+
+def summarize_plc_snapshot(
+    snapshot: dict,
+    *,
+    scan_interval_seconds: float = 5.0,
+    reject_count: int = 0,
+    ideal_cycle_seconds: float = 5.0,
+) -> dict:
+    """Derive transparent production/OEE inputs from a VirtualPLC snapshot."""
+    if scan_interval_seconds <= 0:
+        raise ValueError("scan_interval_seconds must be positive")
+    machine_id = str(snapshot.get("machine_id", "")).strip()
+    if not machine_id:
+        raise ValueError("machine_id cannot be empty")
+    scans = int(snapshot.get("scan_counter", 0))
+    cycles = int(snapshot.get("cycle_count", 0))
+    downtime = max(0.0, float(snapshot.get("downtime_minutes", 0)))
+    if scans < 0 or cycles < 0:
+        raise ValueError("PLC counters cannot be negative")
+    elapsed = scans * scan_interval_seconds / 60.0
+    runtime = max(0.0, elapsed - downtime)
+    return summarize_production(
+        machine_id=machine_id,
+        cycle_count=cycles,
+        downtime_minutes=downtime,
+        runtime_minutes=runtime,
+        reject_count=reject_count,
+        ideal_cycle_seconds=ideal_cycle_seconds,
+    )
