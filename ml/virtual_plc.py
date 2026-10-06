@@ -9,6 +9,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Any
 
+from ml.machine_state import MachineStateEngine
 from ml.telemetry_simulator import generate_reading
 
 
@@ -42,6 +43,7 @@ class VirtualPLC:
         self.machine_id = machine_id
         self.scenario = scenario
         self.registers = PLCRegisters(machine_id=machine_id)
+        self.state_engine = MachineStateEngine()
 
     def configure(self, *, scenario: str | None = None, mode: str | None = None) -> dict[str, Any]:
         if scenario is not None:
@@ -73,7 +75,20 @@ class VirtualPLC:
         self.registers.downtime_minutes = float(reading["downtime_minutes"])
         self.registers.fault_code = str(reading["fault_code"])
         self.registers.alarm_active = self.registers.fault_code != "NONE"
-        self.registers.state = "FAULT" if self.scenario != "normal" and self.registers.alarm_active else "RUNNING"
+
+        # Deterministic state scoring keeps machine lifecycle separate from ML.
+        temp_penalty = max(0.0, self.registers.motor_temperature_c - 70.0) * 1.5
+        pressure_penalty = max(0.0, self.registers.pressure_bar - 60.0) * 1.2
+        vibration_penalty = max(0.0, self.registers.vibration_mm_s - 4.0) * 8.0
+        health_score = 100.0 - temp_penalty - pressure_penalty - vibration_penalty
+        if self.state_engine.state.value == "OFFLINE":
+            self.state_engine.start()
+            self.state_engine.complete_startup()
+        self.state_engine.evaluate(health_score=health_score, alarm_active=self.registers.alarm_active)
+        if self.state_engine.state.value in {"RUNNING", "WARNING", "DEGRADED"}:
+            self.state_engine.record_cycle()
+        self.registers.cycle_count = self.state_engine.cycles
+        self.registers.state = self.state_engine.state.value
         return self.snapshot()
 
     def snapshot(self) -> dict[str, Any]:
@@ -92,5 +107,6 @@ class VirtualPLC:
             "fault_code": self.registers.fault_code,
             "alarm_active": self.registers.alarm_active,
             "heartbeat": self.registers.heartbeat,
+            "state_engine": self.state_engine.snapshot(),
             "read_only_to_self_brain": True,
         }
