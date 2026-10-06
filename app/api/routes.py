@@ -29,6 +29,7 @@ from ml.replacement_workflow import validate_early_replacement
 from ml.root_cause import analyze_root_causes
 from ml.spare_management import analyze_inventory, spare_status
 from ml.self_brain_ml import SelfBrainML
+from ml.production_monitor import summarize_production
 
 _SELF_BRAIN: SelfBrainML | None = None
 _PLC_GATEWAYS: dict[str, PLCGateway] = {}
@@ -292,6 +293,27 @@ def industrial_assistant(payload: dict) -> dict:
 def validation_run() -> dict:
     """Run the deterministic software validation suite without storing telemetry."""
     return run_validation_suite()
+
+
+
+@router.post("/production/summary")
+def production_summary(payload: dict) -> dict:
+    """Return transparent production/OEE metrics for the current virtual machine."""
+    try:
+        return {
+            "status": "ok",
+            "production": summarize_production(
+                machine_id=str(payload.get("machine_id", "M-001")).strip(),
+                cycle_count=int(payload.get("cycle_count", 0)),
+                downtime_minutes=float(payload.get("downtime_minutes", 0)),
+                runtime_minutes=float(payload.get("runtime_minutes", 0)),
+                reject_count=int(payload.get("reject_count", 0)),
+                ideal_cycle_seconds=float(payload.get("ideal_cycle_seconds", 5)),
+            ),
+            "source": "virtual-plc-simulation",
+        }
+    except (TypeError, ValueError) as exc:
+        return {"status": "rejected", "error": str(exc)}
 
 
 @router.get("/dashboard/overview")
