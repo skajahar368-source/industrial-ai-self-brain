@@ -62,6 +62,12 @@ def maintenance_risk(reading: dict[str, Any]) -> dict[str, Any]:
         score += 10
         factors.append(f"fault code: {fault_code}")
 
+    # A critical machine fault is a high-risk maintenance condition even when
+    # individual sensor thresholds have not yet accumulated enough score.
+    if fault_code in {"HIGH_TEMP_PRESSURE", "MULTI_PARAMETER_FAULT"}:
+        score = max(score, 70)
+        factors.append("critical multi-parameter fault")
+
     score = _clamp(score)
 
     if score >= 70:
