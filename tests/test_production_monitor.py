@@ -31,3 +31,18 @@ def test_rejects_invalid_counts():
         assert "reject_count" in str(exc)
     else:
         raise AssertionError("expected ValueError")
+
+
+def test_production_metrics_from_plc_snapshot():
+    from ml.production_monitor import summarize_plc_snapshot
+
+    result = summarize_plc_snapshot({
+        "machine_id": "M-PLC",
+        "scan_counter": 120,
+        "cycle_count": 100,
+        "downtime_minutes": 2,
+    })
+    assert result["machine_id"] == "M-PLC"
+    assert result["total_count"] == 100
+    assert result["downtime_minutes"] == 2.0
+    assert result["runtime_minutes"] == 8.0
