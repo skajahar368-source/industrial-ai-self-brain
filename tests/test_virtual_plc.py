@@ -40,3 +40,11 @@ def test_virtual_plc_supports_specific_fault_modes():
         snapshot = plc.scan()
         assert snapshot["scenario"] == scenario
         assert snapshot["fault_code"] != "NONE"
+
+
+def test_virtual_plc_failure_alias_reaches_fault():
+    plc = VirtualPLC("M-FAIL-ALIAS", "failure")
+    snapshot = plc.scan()
+    assert snapshot["state"] == "FAULT"
+    assert snapshot["fault_code"] == "HIGH_TEMP_PRESSURE"
+    assert snapshot["alarm_active"] is True
