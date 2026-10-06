@@ -8,7 +8,7 @@ SCENARIOS = {"normal", "thermal", "pressure", "vibration", "combined"}
 
 def generate_reading(machine_id: str = "M-001", step: int = 0, scenario: str = "normal", interval_seconds: int = 5) -> dict[str, Any]:
     """Generate deterministic industrial telemetry for controlled fault injection."""
-    scenario = scenario.lower().strip()
+    scenario = {"warning": "thermal", "failure": "combined"}.get(scenario.lower().strip(), scenario.lower().strip())
     if scenario not in SCENARIOS:
         raise ValueError(f"scenario must be one of: {sorted(SCENARIOS)}")
     if step < 0:
