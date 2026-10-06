@@ -22,12 +22,15 @@ from ml.failure_pattern_learning import (
 )
 from ml.part_lifecycle import active_part_life
 from ml.predictive_maintenance import maintenance_risk, score_dataframe
+from ml.plc_gateway import PLCGateway
+from ml.virtual_plc import VirtualPLC
 from ml.replacement_workflow import validate_early_replacement
 from ml.root_cause import analyze_root_causes
 from ml.spare_management import analyze_inventory, spare_status
 from ml.self_brain_ml import SelfBrainML
 
 _SELF_BRAIN: SelfBrainML | None = None
+_PLC_GATEWAYS: dict[str, PLCGateway] = {}
 
 router = APIRouter(prefix="/api")
 DATA_PATH = Path("data/machine_data.csv")
@@ -38,6 +41,119 @@ PART_HISTORY_PATH = Path("data/part_replacement_history.csv")
 @router.get("/health")
 def api_health() -> dict:
     return {"status": "healthy"}
+
+
+def _get_plc_gateway(machine_id: str = "M-001", scenario: str | None = None) -> PLCGateway:
+    machine_id = str(machine_id).strip()
+    if not machine_id:
+        raise ValueError("machine_id cannot be empty")
+    gateway = _PLC_GATEWAYS.get(machine_id)
+    if gateway is None:
+        gateway = PLCGateway(VirtualPLC(machine_id=machine_id, scenario=scenario or "normal"))
+        _PLC_GATEWAYS[machine_id] = gateway
+    elif scenario is not None:
+        gateway.configure(scenario=scenario)
+    return gateway
+
+
+@router.get("/plc/status")
+def plc_status(machine_id: str = "M-001") -> dict:
+    try:
+        return {"status": "ok", "plc": _get_plc_gateway(machine_id).plc.snapshot()}
+    except ValueError as exc:
+        return {"status": "rejected", "error": str(exc)}
+
+
+@router.post("/plc/configure")
+def plc_configure(payload: dict) -> dict:
+    try:
+        gateway = _get_plc_gateway(
+            machine_id=str(payload.get("machine_id", "M-001")),
+        )
+        return {
+            "status": "configured",
+            "plc": gateway.configure(
+                scenario=payload.get("scenario"),
+                mode=payload.get("mode"),
+            ),
+        }
+    except ValueError as exc:
+        return {"status": "rejected", "error": str(exc)}
+
+
+@router.post("/plc/scan")
+def plc_scan(payload: dict) -> dict:
+    try:
+        gateway = _get_plc_gateway(
+            machine_id=str(payload.get("machine_id", "M-001")),
+            scenario=payload.get("scenario"),
+        )
+        return {"status": "ok", **gateway.scan()}
+    except (TypeError, ValueError) as exc:
+        return {"status": "rejected", "error": str(exc)}
+
+
+@router.post("/gateway/scan")
+def gateway_scan(payload: dict) -> dict:
+    """Read PLC -> ingest telemetry -> run Self-Brain decision support.
+
+    This endpoint deliberately performs no PLC control write. It is the first
+    end-to-end bridge between the virtual PLC and the existing ML layer.
+    """
+    global _SELF_BRAIN
+    try:
+        gateway = _get_plc_gateway(
+            machine_id=str(payload.get("machine_id", "M-001")),
+            scenario=payload.get("scenario"),
+        )
+        scanned = gateway.scan()
+        machine_id = scanned["plc"]["machine_id"]
+        readings = recent_telemetry(machine_id=machine_id, limit=20)
+        latest = readings[0]
+        quality = assess_telemetry_quality(
+            readings,
+            reference_time=payload.get("reference_time"),
+            stale_after_seconds=int(payload.get("stale_after_seconds", 60)),
+        )
+        health = evaluate_machine_health(latest)
+        risk = maintenance_risk(latest)
+
+        brain: dict[str, Any]
+        if len(readings) < 12:
+            brain = {
+                "status": "warming_up",
+                "reason": "Self-Brain requires at least 12 telemetry readings for its current window.",
+                "readings_available": len(readings),
+            }
+        else:
+            blocking = {"invalid_timestamp", "missing_sensor"}
+            blocking_issues = [issue for issue in quality["issues"] if issue["type"] in blocking]
+            if blocking_issues:
+                brain = {
+                    "status": "blocked",
+                    "reason": "telemetry_quality",
+                    "quality": quality,
+                }
+            else:
+                if _SELF_BRAIN is None:
+                    _SELF_BRAIN = SelfBrainML()
+                    _SELF_BRAIN.train()
+                brain = _SELF_BRAIN.diagnose(readings, machine_id=machine_id)
+
+        return {
+            "status": "ok",
+            "pipeline": "PLC -> Gateway -> Telemetry -> Health/Risk -> Self-Brain",
+            "plc": scanned["plc"],
+            "telemetry": scanned["telemetry"],
+            "ingestion": scanned["ingestion"],
+            "telemetry_quality": quality,
+            "health": health,
+            "maintenance_risk": risk,
+            "brain": brain,
+            "control_write_performed": False,
+        }
+    except (TypeError, ValueError) as exc:
+        return {"status": "rejected", "error": str(exc)}
 
 
 @router.post("/telemetry/quality")
