@@ -12,6 +12,7 @@ def evaluate_machine_health(data: dict[str, Any]) -> dict[str, Any]:
     temperature = float(data.get("temperature_c", 0))
     pressure = float(data.get("pressure_bar", 0))
     vibration = float(data.get("vibration_mm_s", 0))
+    fault_code = str(data.get("fault_code", "NONE"))
 
     warnings: list[str] = []
 
@@ -30,7 +31,10 @@ def evaluate_machine_health(data: dict[str, Any]) -> dict[str, Any]:
     elif vibration >= 5:
         warnings.append("Elevated vibration")
 
-    if any(w.startswith("High") for w in warnings):
+    if fault_code in {"HIGH_TEMP_PRESSURE", "MULTI_PARAMETER_FAULT"}:
+        warnings.append("Critical multi-parameter fault")
+        status = "critical"
+    elif any(w.startswith("High") for w in warnings):
         status = "critical"
     elif warnings:
         status = "warning"

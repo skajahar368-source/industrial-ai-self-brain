@@ -24,7 +24,7 @@ def test_virtual_plc_failure_scenario_sets_alarm():
 
 
 def test_gateway_maps_plc_registers_to_normalized_telemetry():
-    plc = VirtualPLC("M-GATE", "warning")
+    plc = VirtualPLC("M-GATE", "thermal")
     snapshot = plc.scan()
     telemetry = plc_snapshot_to_telemetry(snapshot)
 

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
-SCENARIOS = {"normal", "thermal", "pressure", "vibration", "combined"}
+SCENARIOS = {"normal", "thermal", "pressure", "vibration", "combined", "warning", "failure"}
 
 
 def generate_reading(machine_id: str = "M-001", step: int = 0, scenario: str = "normal", interval_seconds: int = 5) -> dict[str, Any]:
@@ -23,22 +23,24 @@ def generate_reading(machine_id: str = "M-001", step: int = 0, scenario: str = "
     downtime = 0.0
     fault = "NONE"
 
-    if scenario == "normal":
+    effective_scenario = {"warning": "thermal", "failure": "combined"}.get(scenario, scenario)
+
+    if effective_scenario == "normal":
         temperature, pressure, vibration = base_temperature, base_pressure, base_vibration
-    elif scenario == "thermal":
+    elif effective_scenario == "thermal":
         severity = max(0, progress - 5)
         temperature = base_temperature + 0.95 * severity
         pressure, vibration = base_pressure, base_vibration
         downtime = min(30.0, severity * 0.45)
         fault = "THERMAL_DEGRADATION" if severity < 15 else "HIGH_TEMP"
-    elif scenario == "pressure":
+    elif effective_scenario == "pressure":
         severity = max(0, progress - 5)
         temperature = base_temperature + 0.15 * severity
         pressure = base_pressure + 1.65 * severity
         vibration = base_vibration + 0.08 * severity
         downtime = min(30.0, severity * 0.5)
         fault = "PRESSURE_DEGRADATION" if severity < 18 else "HIGH_PRESSURE"
-    elif scenario == "vibration":
+    elif effective_scenario == "vibration":
         severity = max(0, progress - 5)
         temperature = base_temperature + 0.25 * severity
         pressure = base_pressure
@@ -52,6 +54,8 @@ def generate_reading(machine_id: str = "M-001", step: int = 0, scenario: str = "
         vibration = base_vibration + 0.32 * severity
         downtime = min(60.0, severity * 1.1)
         fault = "COMBINED_DEGRADATION" if severity < 12 else "MULTI_PARAMETER_FAULT"
+        if scenario == "failure":
+            fault = "HIGH_TEMP_PRESSURE"
 
     timestamp = datetime.now(timezone.utc) + timedelta(seconds=step * interval_seconds)
     return {
