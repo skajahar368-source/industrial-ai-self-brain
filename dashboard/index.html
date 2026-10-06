@@ -86,11 +86,6 @@ async function refresh(){
   ]);
   $("plcState").textContent=plc.plc.state+" · heartbeat "+plc.plc.heartbeat;
   $("plcMeta").textContent="Scenario: "+plc.plc.scenario+" · Fault: "+plc.plc.fault_code+" · Alarm: "+(plc.plc.alarm_active?"ACTIVE":"clear");
-  /* 
-   get("/machine-health",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(latest)}),
-   get("/maintenance-risk"),
-   get("/spares/alerts")
-  ]); */
   $("temp").textContent=Number(latest.temperature_c).toFixed(1);$("pressure").textContent=Number(latest.pressure_bar).toFixed(1);$("vibration").textContent=Number(latest.vibration_mm_s).toFixed(1);
   $("health").textContent=h.status||"—";setStatus($("healthStatus"),h.status||"Unknown",(h.status==="critical"||h.status==="high")?"critical":h.status==="warning"?"warning":"normal");
   const rows=(risk.maintenance_risk||[]).filter(x=>x.machine_id===machine).slice(-5).reverse();
