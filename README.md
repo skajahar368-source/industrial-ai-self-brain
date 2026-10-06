@@ -145,3 +145,20 @@ telemetry, evaluates machine health and maintenance risk, and—after the ML win
 has warmed up—runs the existing Self-Brain diagnosis.
 
 No PLC control write is performed. The prototype remains advisory and simulation-only.
+
+
+## V1.9 virtual industrial fault lab
+
+The simulator now supports controlled synthetic degradation modes:
+- normal
+- thermal degradation
+- pressure degradation
+- vibration / bearing-style degradation
+- combined multi-parameter degradation
+
+The dashboard includes an **AI Fault Demo** that runs 24 PLC scans through the
+read-only gateway, evaluates health and maintenance risk, performs root-cause
+reasoning, and runs Self-Brain ML diagnosis.
+
+This is a software validation environment. The telemetry is synthetic and does
+not represent measured limits or real-machine accuracy.
