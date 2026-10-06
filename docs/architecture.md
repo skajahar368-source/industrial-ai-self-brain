@@ -108,3 +108,18 @@ telemetry contract.
 The current VirtualPLC intentionally has no control-write API. Self-Brain can read and
 analyze the simulated PLC state, but it cannot start, stop, reset, or otherwise command
 the simulated or real machine through this interface.
+
+
+## V1.9 virtual industrial fault lab
+
+The development simulator now provides five scenarios. Each scenario changes
+specific telemetry signatures so the complete intelligence path can be exercised:
+
+**Scenario → VirtualPLC → Gateway → Telemetry → Health/Risk → Root Cause → Self-Brain**
+
+The `POST /api/simulator/demo` endpoint executes a complete 12–120 sample
+simulation and returns the latest PLC state, telemetry quality, health,
+maintenance risk, root-cause findings, and ML diagnosis.
+
+No machine-control write is exposed. The VirtualPLC remains a read-only data
+source for Self-Brain.
