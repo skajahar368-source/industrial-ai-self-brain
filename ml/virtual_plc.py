@@ -81,6 +81,8 @@ class VirtualPLC:
         pressure_penalty = max(0.0, self.registers.pressure_bar - 60.0) * 1.2
         vibration_penalty = max(0.0, self.registers.vibration_mm_s - 4.0) * 8.0
         health_score = 100.0 - temp_penalty - pressure_penalty - vibration_penalty
+        if self.registers.fault_code in {"HIGH_TEMP", "HIGH_PRESSURE", "HIGH_VIBRATION", "MULTI_PARAMETER_FAULT"}:
+            health_score = min(health_score, 30.0)
         if self.state_engine.state.value == "OFFLINE":
             self.state_engine.start()
             self.state_engine.complete_startup()
