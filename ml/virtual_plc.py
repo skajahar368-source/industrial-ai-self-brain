@@ -47,7 +47,7 @@ class VirtualPLC:
 
     def configure(self, *, scenario: str | None = None, mode: str | None = None) -> dict[str, Any]:
         if scenario is not None:
-            scenario = str(scenario).strip().lower()
+            scenario = {"warning": "thermal", "failure": "combined"}.get(str(scenario).strip().lower(), str(scenario).strip().lower())
             if scenario not in {"normal", "thermal", "pressure", "vibration", "combined"}:
                 raise ValueError("scenario must be one of: ['combined', 'normal', 'pressure', 'thermal', 'vibration']")
             self.scenario = scenario
@@ -81,7 +81,9 @@ class VirtualPLC:
         pressure_penalty = max(0.0, self.registers.pressure_bar - 60.0) * 1.2
         vibration_penalty = max(0.0, self.registers.vibration_mm_s - 4.0) * 8.0
         health_score = 100.0 - temp_penalty - pressure_penalty - vibration_penalty
-        if self.registers.fault_code in {"HIGH_TEMP", "HIGH_PRESSURE", "HIGH_VIBRATION", "MULTI_PARAMETER_FAULT"}:
+        if self.scenario == "combined":
+            health_score = min(health_score, 30.0)
+        elif self.registers.fault_code in {"HIGH_TEMP", "HIGH_PRESSURE", "HIGH_VIBRATION", "MULTI_PARAMETER_FAULT"}:
             health_score = min(health_score, 30.0)
         if self.state_engine.state.value == "OFFLINE":
             self.state_engine.start()
