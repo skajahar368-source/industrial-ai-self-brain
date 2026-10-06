@@ -29,7 +29,7 @@ from ml.replacement_workflow import validate_early_replacement
 from ml.root_cause import analyze_root_causes
 from ml.spare_management import analyze_inventory, spare_status
 from ml.self_brain_ml import SelfBrainML
-from ml.production_monitor import summarize_production
+from ml.production_monitor import summarize_plc_snapshot, summarize_production
 
 _SELF_BRAIN: SelfBrainML | None = None
 _PLC_GATEWAYS: dict[str, PLCGateway] = {}
@@ -311,6 +311,26 @@ def production_summary(payload: dict) -> dict:
                 ideal_cycle_seconds=float(payload.get("ideal_cycle_seconds", 5)),
             ),
             "source": "virtual-plc-simulation",
+        }
+    except (TypeError, ValueError) as exc:
+        return {"status": "rejected", "error": str(exc)}
+
+
+@router.get("/production/summary")
+def production_summary_snapshot(machine_id: str = "M-001", scan_interval_seconds: float = 5.0, reject_count: int = 0, ideal_cycle_seconds: float = 5.0) -> dict:
+    """Return OEE metrics derived from the current VirtualPLC snapshot."""
+    try:
+        gateway = _get_plc_gateway(machine_id)
+        return {
+            "status": "ok",
+            "production": summarize_plc_snapshot(
+                gateway.plc.snapshot(),
+                scan_interval_seconds=scan_interval_seconds,
+                reject_count=reject_count,
+                ideal_cycle_seconds=ideal_cycle_seconds,
+            ),
+            "source": "virtual-plc-snapshot",
+            "control_write_performed": False,
         }
     except (TypeError, ValueError) as exc:
         return {"status": "rejected", "error": str(exc)}
