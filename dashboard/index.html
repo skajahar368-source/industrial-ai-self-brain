@@ -12,10 +12,11 @@
 <div class="toolbar">
 <label>Machine</label><select id="machine"><option>M-001</option><option>M-002</option><option>M-003</option></select>
 <label>Simulation</label><select id="scenario"><option value="normal">Normal</option><option value="warning">Warning</option><option value="failure">Failure</option></select>
-<button onclick="simulate()">Generate Reading</button><button onclick="simulateBatch()">Run 10 Steps</button><button onclick="refresh()">Refresh</button>
+<button onclick="simulate()">Generate Reading</button><button onclick="simulateBatch()">Run 10 Steps</button><button onclick="runPipeline()">PLC → Self-Brain</button><button onclick="refresh()">Refresh</button>
 <span class="small" id="updated"></span>
 </div>
-<div class="card" style="margin-bottom:14px"><div class="label">Simulation state</div><div class="value" id="simState">Idle</div><div class="muted">Controlled telemetry simulation — not connected to a real machine.</div></div>
+<div class="card" style="margin-bottom:14px"><div class="label">PLC / gateway state</div><div class="value" id="plcState">—</div><div class="muted" id="plcMeta">Virtual PLC — read-only development mode.</div></div>
+<div class="card" style="margin-bottom:14px"><div class="label">Pipeline state</div><div class="value" id="simState">Idle</div><div class="muted">PLC → gateway → telemetry → Self-Brain. No control write is performed.</div></div>
 <div class="grid">
 <div class="card"><div class="label">Health</div><div class="value" id="health">—</div><div id="healthStatus" class="status">Loading</div></div>
 <div class="card"><div class="label">Temperature</div><div class="value" id="temp">—</div><div class="muted">°C</div></div>
@@ -27,6 +28,7 @@
 <section class="card"><div class="label">Spare alerts</div><div class="list" id="spares"></div></section>
 </div>
 <section class="card" style="margin-top:14px"><div class="label">Recent telemetry</div><table><thead><tr><th>Time</th><th>Temperature</th><th>Pressure</th><th>Vibration</th><th>Downtime</th><th>Fault</th></tr></thead><tbody id="telemetry"></tbody></table></section>
+<section class="card" style="margin-top:14px"><div class="label">Self-Brain diagnosis</div><div id="brainDiagnosis" class="empty">Run the PLC → Self-Brain pipeline after at least 12 readings to see the ML diagnosis.</div></section>
 <section class="card" style="margin-top:14px"><div class="label">AI Industrial Assistant</div><div class="chat"><input id="question" value="What is the current machine condition?"><button onclick="ask()">Ask</button></div><div id="assistantAnswer"></div></section>
 </main>
 <script>
@@ -44,6 +46,22 @@ async function simulate(){
   await refresh();
  }catch(e){$("simState").textContent="Simulation error: "+e.message}
 }
+async function runPipeline(){
+ const machine=$("machine").value,scenario=$("scenario").value;
+ $("simState").textContent="Running PLC → Self-Brain…";
+ try{
+  const r=await get("/gateway/scan",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({machine_id:machine,scenario})});
+  if(r.status!=="ok"){throw new Error(r.error||"pipeline rejected")}
+  $("plcState").textContent=r.plc.state+" · heartbeat "+r.plc.heartbeat;
+  $("plcMeta").textContent="Scenario: "+r.plc.scenario+" · Fault: "+r.plc.fault_code+" · Alarm: "+(r.plc.alarm_active?"ACTIVE":"clear");
+  const b=r.brain||{};
+  $("brainDiagnosis").innerHTML=b.status==="ok"
+   ? '<div class="row"><span>Predicted fault</span><strong>'+b.predicted_fault+'</strong></div><div class="row"><span>Confidence</span><strong>'+Math.round(Number(b.confidence)*100)+'%</strong></div><div class="row"><span>Anomaly</span><strong>'+String(b.anomaly)+'</strong></div><div class="row"><span>Estimated RUL</span><strong>'+b.estimated_rul_steps+' steps</strong></div><div class="muted" style="margin-top:10px">Training provenance: '+b.provenance+' · Human decision required.</div>'
+   : '<div class="empty">'+(b.reason||"Self-Brain is warming up.")+'</div>';
+  $("simState").textContent="Pipeline complete";
+  await refresh();
+ }catch(e){$("simState").textContent="Pipeline error: "+e.message}
+}
 async function simulateBatch(){
  const machine=$("machine").value,scenario=$("scenario").value;
  $("simState").textContent="Generating 10 "+scenario+" readings…";
@@ -60,11 +78,19 @@ async function refresh(){
   const t=await get("/telemetry?machine_id="+encodeURIComponent(machine)+"&limit=10");
   const latest=(t.telemetry||[])[0];
   if(!latest){$("health").textContent="No data";setStatus($("healthStatus"),"No telemetry","warning");return}
-  const [h,risk,spares]=await Promise.all([
+  const [h,risk,spares,plc]=await Promise.all([
+   get("/machine-health",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(latest)}),
+   get("/maintenance-risk"),
+   get("/spares/alerts"),
+   get("/plc/status?machine_id="+encodeURIComponent(machine))
+  ]);
+  $("plcState").textContent=plc.plc.state+" · heartbeat "+plc.plc.heartbeat;
+  $("plcMeta").textContent="Scenario: "+plc.plc.scenario+" · Fault: "+plc.plc.fault_code+" · Alarm: "+(plc.plc.alarm_active?"ACTIVE":"clear");
+  /* 
    get("/machine-health",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(latest)}),
    get("/maintenance-risk"),
    get("/spares/alerts")
-  ]);
+  ]); */
   $("temp").textContent=Number(latest.temperature_c).toFixed(1);$("pressure").textContent=Number(latest.pressure_bar).toFixed(1);$("vibration").textContent=Number(latest.vibration_mm_s).toFixed(1);
   $("health").textContent=h.status||"—";setStatus($("healthStatus"),h.status||"Unknown",(h.status==="critical"||h.status==="high")?"critical":h.status==="warning"?"warning":"normal");
   const rows=(risk.maintenance_risk||[]).filter(x=>x.machine_id===machine).slice(-5).reverse();
