@@ -11,8 +11,8 @@
 <main>
 <div class="toolbar">
 <label>Machine</label><select id="machine"><option>M-001</option><option>M-002</option><option>M-003</option></select>
-<label>Simulation</label><select id="scenario"><option value="normal">Normal</option><option value="warning">Warning</option><option value="failure">Failure</option></select>
-<button onclick="simulate()">Generate Reading</button><button onclick="simulateBatch()">Run 10 Steps</button><button onclick="runPipeline()">PLC → Self-Brain</button><button onclick="refresh()">Refresh</button>
+<label>Simulation</label><select id="scenario"><option value="normal">Normal</option><option value="thermal">Thermal degradation</option><option value="pressure">Pressure degradation</option><option value="vibration">Vibration / bearing</option><option value="combined">Combined fault</option></select>
+<button onclick="simulate()">Generate Reading</button><button onclick="simulateBatch()">Run 24 Steps</button><button onclick="runDemo()">▶ Run AI Fault Demo</button><button onclick="runPipeline()">PLC → Self-Brain</button><button onclick="refresh()">Refresh</button>
 <span class="small" id="updated"></span>
 </div>
 <div class="card" style="margin-bottom:14px"><div class="label">PLC / gateway state</div><div class="value" id="plcState">—</div><div class="muted" id="plcMeta">Virtual PLC — read-only development mode.</div></div>
@@ -27,8 +27,10 @@
 <section class="card"><div class="label">Maintenance intelligence</div><div class="list" id="intelligence"></div></section>
 <section class="card"><div class="label">Spare alerts</div><div class="list" id="spares"></div></section>
 </div>
+<section class="card" style="margin-top:14px"><div class="label">Live signal trend</div><div id="trendChart" style="height:180px;display:flex;align-items:end;gap:4px;padding:15px 4px 5px;background:#0d1525;border-radius:8px;margin-top:12px"></div><div class="small">Temperature trend · last 10 readings</div></section>
 <section class="card" style="margin-top:14px"><div class="label">Recent telemetry</div><table><thead><tr><th>Time</th><th>Temperature</th><th>Pressure</th><th>Vibration</th><th>Downtime</th><th>Fault</th></tr></thead><tbody id="telemetry"></tbody></table></section>
-<section class="card" style="margin-top:14px"><div class="label">Self-Brain diagnosis</div><div id="brainDiagnosis" class="empty">Run the PLC → Self-Brain pipeline after at least 12 readings to see the ML diagnosis.</div></section>
+<section class="card" style="margin-top:14px"><div class="label">Self-Brain diagnosis</div><div id="brainDiagnosis" class="empty">Run the AI Fault Demo or collect at least 12 readings to see the ML diagnosis.</div></section>
+<section class="card" style="margin-top:14px"><div class="label">Root-cause reasoning</div><div id="rootCause" class="empty">No diagnosis yet.</div></section>
 <section class="card" style="margin-top:14px"><div class="label">AI Industrial Assistant</div><div class="chat"><input id="question" value="What is the current machine condition?"><button onclick="ask()">Ask</button></div><div id="assistantAnswer"></div></section>
 </main>
 <script>
@@ -46,6 +48,29 @@ async function simulate(){
   await refresh();
  }catch(e){$("simState").textContent="Simulation error: "+e.message}
 }
+async function runDemo(){
+ const machine=$("machine").value,scenario=$("scenario").value;
+ $("simState").textContent="Running "+scenario+" degradation through VirtualPLC…";
+ try{
+  const r=await get("/simulator/demo",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({machine_id:machine,scenario,count:24})});
+  if(r.status!=="ok") throw new Error(r.error||"demo rejected");
+  $("plcState").textContent=r.plc.state+" · heartbeat "+r.plc.heartbeat;
+  $("plcMeta").textContent="Scenario: "+r.demo.scenario+" · Fault: "+r.plc.fault_code+" · Alarm: "+(r.plc.alarm_active?"ACTIVE":"clear");
+  renderBrain(r.brain);
+  renderRootCause(r.root_cause);
+  $("simState").textContent="AI fault demo complete · "+r.demo.samples+" PLC samples";
+  await refresh();
+ }catch(e){$("simState").textContent="Demo error: "+e.message}
+}
+function renderBrain(b){
+ $("brainDiagnosis").innerHTML=b&&b.status==="ok"
+  ? '<div class="row"><span>Predicted fault</span><strong>'+b.predicted_fault+'</strong></div><div class="row"><span>Confidence</span><strong>'+Math.round(Number(b.confidence)*100)+'%</strong></div><div class="row"><span>Anomaly</span><strong>'+String(b.anomaly)+'</strong></div><div class="row"><span>Estimated RUL</span><strong>'+b.estimated_rul_steps+' steps</strong></div><div class="muted" style="margin-top:10px">Synthetic training · decision support only.</div>'
+  : '<div class="empty">'+((b&&b.reason)||"Self-Brain is warming up.")+'</div>';
+}
+function renderRootCause(r){
+ if(!r||!r.causes||!r.causes.length){$("rootCause").innerHTML='<div class="empty">No significant cause detected.</div>';return}
+ $("rootCause").innerHTML='<div class="row"><span>Priority</span><strong>'+r.priority+'</strong></div>'+r.causes.map(x=>'<div class="row"><span>'+x.cause+'</span><span class="muted">'+x.evidence+'</span></div>').join("");
+}
 async function runPipeline(){
  const machine=$("machine").value,scenario=$("scenario").value;
  $("simState").textContent="Running PLC → Self-Brain…";
@@ -58,6 +83,8 @@ async function runPipeline(){
   $("brainDiagnosis").innerHTML=b.status==="ok"
    ? '<div class="row"><span>Predicted fault</span><strong>'+b.predicted_fault+'</strong></div><div class="row"><span>Confidence</span><strong>'+Math.round(Number(b.confidence)*100)+'%</strong></div><div class="row"><span>Anomaly</span><strong>'+String(b.anomaly)+'</strong></div><div class="row"><span>Estimated RUL</span><strong>'+b.estimated_rul_steps+' steps</strong></div><div class="muted" style="margin-top:10px">Training provenance: '+b.provenance+' · Human decision required.</div>'
    : '<div class="empty">'+(b.reason||"Self-Brain is warming up.")+'</div>';
+  renderRootCause(r.root_cause);
+  renderBrain(r.brain);
   $("simState").textContent="Pipeline complete";
   await refresh();
  }catch(e){$("simState").textContent="Pipeline error: "+e.message}
@@ -91,6 +118,7 @@ async function refresh(){
   const rows=(risk.maintenance_risk||[]).filter(x=>x.machine_id===machine).slice(-5).reverse();
   $("intelligence").innerHTML=rows.length?rows.map(x=>'<div class="row"><span>Maintenance risk</span><strong>'+Number(x.maintenance_risk_score).toFixed(0)+'/100 · '+x.risk_level+'</strong></div>').join(""):'<div class="empty">No historical risk data.</div>';
   $("spares").innerHTML=(spares.alerts||[]).length?spares.alerts.slice(0,6).map(x=>'<div class="row"><span>'+x.part_name+'</span><strong>'+x.status+'</strong></div>').join(""):'<div class="empty">No spare alerts.</div>';
+  const series=(t.telemetry||[]).slice().reverse(); const maxTemp=Math.max(...series.map(x=>Number(x.temperature_c)),1); $("trendChart").innerHTML=series.map(x=>'<div title="'+x.temperature_c+' °C" style="flex:1;height:'+Math.max(8,Math.round(Number(x.temperature_c)/maxTemp*100))+'%;background:#3b82f6;border-radius:3px 3px 0 0"></div>').join("");
   $("telemetry").innerHTML=(t.telemetry||[]).map(x=>'<tr><td>'+String(x.timestamp).replace("T"," ").slice(0,19)+'</td><td>'+x.temperature_c+'</td><td>'+x.pressure_bar+'</td><td>'+x.vibration_mm_s+'</td><td>'+x.downtime_minutes+'</td><td>'+x.fault_code+'</td></tr>').join("");
   $("updated").textContent="Updated "+new Date().toLocaleTimeString();
  }catch(e){$("connection").textContent="● API Error";$("connection").style.background="#401b25";$("updated").textContent=e.message}
