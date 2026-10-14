@@ -45,11 +45,15 @@ def plc_snapshot_to_telemetry(snapshot: dict[str, Any]) -> dict[str, Any]:
 
 
 class PLCGateway:
-    """Read a PLC, normalize the data, and publish it to telemetry ingestion."""
+    """Read a PLC, normalize data, and publish it to telemetry ingestion."""
 
-    def __init__(self, plc: VirtualPLC) -> None:
+    def __init__(
+        self,
+        plc: VirtualPLC,
+        alarm_manager: AlarmManager | None = None,
+    ) -> None:
         self.plc = plc
-        self.alarm_manager = AlarmManager()
+        self.alarm_manager = alarm_manager if alarm_manager is not None else AlarmManager()
 
     def configure(self, **kwargs: Any) -> dict[str, Any]:
         return self.plc.configure(**kwargs)

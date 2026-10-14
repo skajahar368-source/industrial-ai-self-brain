@@ -108,7 +108,8 @@ The CI workflow runs the complete pytest suite on Python 3.11.
 
 - **Validation Center:** deliberately test normal, warning, failure, missing, duplicate, invalid, stale, and contradictory telemetry.
 - **V2.4:** integrate Self-Brain ML with telemetry-quality confidence and machine-specific baselines.
-- **V2.5:** continuous learning using verified maintenance outcomes and failure history.
+- **V2.5:** persistent alarm history with SQLite, restart recovery, and persistence tests.
+- **V2.6:** continuous learning using verified maintenance outcomes and failure history.
 - **V3.x:** production-style deployment and real industrial data integration.
 - **Future:** PLC/SCADA/OPC-UA/MQTT/IIoT integrations, multi-machine intelligence, stronger RUL models, MLOps, explainability, and digital-twin workflows.
 
@@ -117,8 +118,9 @@ The CI workflow runs the complete pytest suite on Python 3.11.
 - Track alarm raise, repeat observation, clear, severity, and acknowledgement timestamps.
 - Expose `GET /api/plc/alarms` and `GET /api/plc/alarms?machine_id=M-001`.
 - Acknowledge an alarm with `POST /api/plc/alarms/acknowledge`, using `machine_id`, `alarm_id`, and `acknowledged_by`.
-- Alarm acknowledgement updates only Self-Brain's in-memory event log; it does not acknowledge or reset a physical PLC alarm.
-- Alarm history is currently in-memory and is lost when the API process restarts.
+- Alarm acknowledgement updates only Self-Brain's event log; it does not acknowledge or reset a physical PLC alarm.
+- Alarm history is stored in SQLite at `data/alarm_history.sqlite3` by default and survives API process restarts.
+- Set `SELF_BRAIN_ALARM_DB` to use a different database path.
 - PLC access remains read-only; all responses explicitly report that no control write was performed.
 
 Example acknowledgement payload:
@@ -148,6 +150,25 @@ The suite covers:
 - invalid alarm inputs.
 
 These checks exercise the simulation and software contract only. They do not establish real-machine prediction accuracy, production safety, or compatibility with a physical PLC.
+
+### V2.5: Persistent alarm history
+
+The API now uses SQLite to preserve alarm records across process restarts.
+
+- Alarm raise, repeated observation, clear, and acknowledgement metadata are persisted.
+- Alarm IDs continue increasing after restart.
+- The alarm history endpoint reads saved records even before a machine gateway is recreated.
+- The database path defaults to `data/alarm_history.sqlite3`; set `SELF_BRAIN_ALARM_DB` to override it.
+- Direct `AlarmManager()` instances remain in-memory unless a database path is provided, keeping unit tests isolated.
+- SQLite persistence is for Self-Brain's event log only. It never sends PLC commands or resets physical alarms.
+
+Persistence tests:
+
+```bash
+PYTHONPATH=. pytest -q tests/test_alarm_persistence.py
+```
+
+The database is local application state. Back it up according to your deployment requirements; do not commit a live database containing operational records.
 
 ## Testing
 

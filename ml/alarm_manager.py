@@ -1,30 +1,102 @@
-"""Read-only alarm lifecycle tracking for Self-Brain.
+"""Read-only alarm lifecycle tracking with optional SQLite persistence.
 
 This registry records alarm transitions observed from PLC snapshots. It never
 sends commands to a PLC and never changes machine operating state.
 """
 from __future__ import annotations
 
+import json
+import sqlite3
 from datetime import datetime, timezone
+from pathlib import Path
 from threading import RLock
 from typing import Any
 
 
 class AlarmManager:
-    """In-memory alarm history with explicit acknowledgement metadata."""
+    """Alarm history with optional persistence and acknowledgement metadata.
 
-    def __init__(self, max_history: int = 500) -> None:
+    When db_path is provided, alarm history survives process restarts.
+    Omitting it keeps the manager in-memory only, which is useful for isolated
+    tests. Persistence stores Self-Brain's log only; it never writes to a PLC.
+    """
+
+    def __init__(
+        self,
+        max_history: int = 500,
+        db_path: str | Path | None = None,
+    ) -> None:
         if max_history < 1:
             raise ValueError("max_history must be positive")
         self.max_history = max_history
+        self.db_path = str(db_path) if db_path is not None else None
         self._history: list[dict[str, Any]] = []
         self._active_by_machine: dict[str, str] = {}
         self._next_id = 1
         self._lock = RLock()
+        self._connection: sqlite3.Connection | None = None
+
+        if self.db_path is not None:
+            if self.db_path != ":memory:":
+                Path(self.db_path).parent.mkdir(parents=True, exist_ok=True)
+            self._connection = sqlite3.connect(self.db_path, check_same_thread=False)
+            self._connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS alarm_state (
+                    id INTEGER PRIMARY KEY CHECK (id = 1),
+                    next_id INTEGER NOT NULL,
+                    history_json TEXT NOT NULL
+                )
+                """
+            )
+            self._connection.commit()
+            self._load_locked()
 
     @staticmethod
     def _now() -> str:
         return datetime.now(timezone.utc).isoformat()
+
+    def _load_locked(self) -> None:
+        if self._connection is None:
+            return
+        row = self._connection.execute(
+            "SELECT next_id, history_json FROM alarm_state WHERE id = 1"
+        ).fetchone()
+        if row is None:
+            return
+        self._next_id = max(1, int(row[0]))
+        loaded = json.loads(row[1])
+        if not isinstance(loaded, list):
+            raise ValueError("Stored alarm history must be a list")
+        self._history = [item for item in loaded if isinstance(item, dict)][-self.max_history:]
+        self._active_by_machine = {
+            item["machine_id"]: item["alarm_id"]
+            for item in self._history
+            if item.get("active") is True
+        }
+
+    def _save_locked(self) -> None:
+        if self._connection is None:
+            return
+        payload = json.dumps(self._history, separators=(",", ":"), ensure_ascii=False)
+        with self._connection:
+            self._connection.execute(
+                """
+                INSERT INTO alarm_state (id, next_id, history_json)
+                VALUES (1, ?, ?)
+                ON CONFLICT(id) DO UPDATE SET
+                    next_id = excluded.next_id,
+                    history_json = excluded.history_json
+                """,
+                (self._next_id, payload),
+            )
+
+    def close(self) -> None:
+        """Close the optional SQLite connection."""
+        with self._lock:
+            if self._connection is not None:
+                self._connection.close()
+                self._connection = None
 
     def observe(self, snapshot: dict[str, Any]) -> dict[str, Any] | None:
         """Record a new alarm or close an existing alarm from a PLC snapshot."""
@@ -39,6 +111,7 @@ class AlarmManager:
             if active and current and current["fault_code"] == fault_code and current["active"]:
                 current["last_seen_at"] = self._now()
                 current["machine_state"] = str(snapshot.get("state", "UNKNOWN"))
+                self._save_locked()
                 return dict(current)
             if current and current["active"]:
                 current["active"] = False
@@ -46,6 +119,7 @@ class AlarmManager:
                 if not active:
                     self._active_by_machine.pop(machine_id, None)
             if not active:
+                self._save_locked()
                 return None
 
             state = str(snapshot.get("state", "UNKNOWN")).upper()
@@ -74,6 +148,7 @@ class AlarmManager:
                 removed = self._history.pop(0)
                 if self._active_by_machine.get(removed["machine_id"]) == removed["alarm_id"]:
                     self._active_by_machine.pop(removed["machine_id"], None)
+            self._save_locked()
             return dict(alarm)
 
     def acknowledge(self, alarm_id: str, acknowledged_by: str) -> dict[str, Any]:
@@ -92,6 +167,7 @@ class AlarmManager:
                 alarm["acknowledged"] = True
                 alarm["acknowledged_at"] = self._now()
                 alarm["acknowledged_by"] = acknowledged_by
+                self._save_locked()
             return dict(alarm)
 
     def snapshot(self, machine_id: str | None = None) -> dict[str, Any]:
