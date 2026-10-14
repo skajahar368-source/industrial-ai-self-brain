@@ -112,6 +112,25 @@ The CI workflow runs the complete pytest suite on Python 3.11.
 - **V3.x:** production-style deployment and real industrial data integration.
 - **Future:** PLC/SCADA/OPC-UA/MQTT/IIoT integrations, multi-machine intelligence, stronger RUL models, MLOps, explainability, and digital-twin workflows.
 
+### V2.3: Read-only PLC alarm history
+
+- Track alarm raise, repeat observation, clear, severity, and acknowledgement timestamps.
+- Expose `GET /api/plc/alarms` and `GET /api/plc/alarms?machine_id=M-001`.
+- Acknowledge an alarm with `POST /api/plc/alarms/acknowledge`, using `machine_id`, `alarm_id`, and `acknowledged_by`.
+- Alarm acknowledgement updates only Self-Brain's in-memory event log; it does not acknowledge or reset a physical PLC alarm.
+- Alarm history is currently in-memory and is lost when the API process restarts.
+- PLC access remains read-only; all responses explicitly report that no control write was performed.
+
+Example acknowledgement payload:
+
+```json
+{
+  "machine_id": "M-001",
+  "alarm_id": "AL-000001",
+  "acknowledged_by": "maintenance-technician"
+}
+```
+
 ## Testing
 
 Run locally:

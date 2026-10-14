@@ -95,6 +95,59 @@ def plc_scan(payload: dict) -> dict:
         return {"status": "rejected", "error": str(exc)}
 
 
+@router.get("/plc/alarms")
+def plc_alarms(machine_id: str | None = None) -> dict:
+    """Return alarm history observed from PLC snapshots; this endpoint is read-only."""
+    if machine_id is not None:
+        machine_id = str(machine_id).strip()
+        if not machine_id:
+            return {"status": "rejected", "error": "machine_id cannot be empty"}
+        gateway = _PLC_GATEWAYS.get(machine_id)
+        if gateway is None:
+            return {
+                "status": "ok",
+                "count": 0,
+                "active_count": 0,
+                "alarms": [],
+                "read_only_to_plc": True,
+                "control_write_performed": False,
+            }
+        return gateway.alarm_manager.snapshot(machine_id=machine_id)
+    alarms = [gateway.alarm_manager.snapshot() for gateway in _PLC_GATEWAYS.values()]
+    records = [alarm for result in alarms for alarm in result["alarms"]]
+    active = sum(1 for alarm in records if alarm["active"])
+    return {
+        "status": "ok",
+        "count": len(records),
+        "active_count": active,
+        "alarms": sorted(records, key=lambda alarm: alarm["raised_at"], reverse=True),
+        "read_only_to_plc": True,
+        "control_write_performed": False,
+    }
+
+
+@router.post("/plc/alarms/acknowledge")
+def plc_alarm_acknowledge(payload: dict) -> dict:
+    """Acknowledge an alarm in Self-Brain's log without writing to the PLC."""
+    machine_id = str(payload.get("machine_id", "M-001")).strip()
+    alarm_id = str(payload.get("alarm_id", "")).strip()
+    acknowledged_by = str(payload.get("acknowledged_by", "")).strip()
+    if not machine_id:
+        return {"status": "rejected", "error": "machine_id cannot be empty"}
+    gateway = _PLC_GATEWAYS.get(machine_id)
+    if gateway is None:
+        return {"status": "rejected", "error": "machine_id has no alarm history"}
+    try:
+        alarm = gateway.alarm_manager.acknowledge(alarm_id, acknowledged_by)
+        return {
+            "status": "acknowledged",
+            "alarm": alarm,
+            "control_write_performed": False,
+        }
+    except ValueError as exc:
+        return {"status": "rejected", "error": str(exc)}
+
+
 @router.post("/simulator/demo")
 def simulator_demo(payload: dict) -> dict:
     """Run a complete virtual-machine degradation demo through the PLC gateway."""

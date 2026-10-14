@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any
 
+from ml.alarm_manager import AlarmManager
 from ml.telemetry_ingestion import ingest_reading
 from ml.virtual_plc import VirtualPLC
 
@@ -48,17 +49,20 @@ class PLCGateway:
 
     def __init__(self, plc: VirtualPLC) -> None:
         self.plc = plc
+        self.alarm_manager = AlarmManager()
 
     def configure(self, **kwargs: Any) -> dict[str, Any]:
         return self.plc.configure(**kwargs)
 
     def scan(self) -> dict[str, Any]:
         snapshot = self.plc.scan()
+        self.alarm_manager.observe(snapshot)
         telemetry = plc_snapshot_to_telemetry(snapshot)
         ingestion = ingest_reading(telemetry)
         return {
             "plc": snapshot,
             "telemetry": telemetry,
             "ingestion": ingestion,
+            "alarms": self.alarm_manager.snapshot(machine_id=snapshot["machine_id"]),
             "control_write_performed": False,
         }
