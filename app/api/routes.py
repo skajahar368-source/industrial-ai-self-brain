@@ -25,6 +25,7 @@ from ml.failure_pattern_learning import (
 from ml.part_lifecycle import active_part_life
 from ml.predictive_maintenance import maintenance_risk, score_dataframe
 from ml.alarm_manager import AlarmManager
+from ml.verified_maintenance_learning import VerifiedMaintenanceLearning
 from ml.plc_gateway import PLCGateway
 from ml.virtual_plc import VirtualPLC
 from ml.replacement_workflow import validate_early_replacement
@@ -36,6 +37,7 @@ from ml.production_monitor import summarize_plc_snapshot, summarize_production
 _SELF_BRAIN: SelfBrainML | None = None
 _PLC_GATEWAYS: dict[str, PLCGateway] = {}
 ALARM_DB_PATH = Path(os.environ.get("SELF_BRAIN_ALARM_DB", "data/alarm_history.sqlite3"))
+VERIFIED_MAINTENANCE_DB = Path(os.environ.get("SELF_BRAIN_MAINTENANCE_DB", "data/verified_maintenance.sqlite3"))
 _ALARM_MANAGER = AlarmManager(db_path=ALARM_DB_PATH)
 
 router = APIRouter(prefix="/api")
@@ -503,6 +505,29 @@ def failure_pattern_outcome(payload: dict) -> dict:
 @router.get("/failure-patterns/summary")
 def failure_pattern_summary() -> dict:
     return summarize_learning_outcomes()
+
+@router.post("/maintenance-learning/outcomes")
+def record_verified_maintenance_outcome(payload: dict) -> dict:
+    """Record a human-verified repair outcome; never changes models or PLC state."""
+    store = VerifiedMaintenanceLearning(VERIFIED_MAINTENANCE_DB)
+    try:
+        return store.record(payload)
+    finally:
+        store.close()
+
+
+@router.get("/maintenance-learning/insights")
+def verified_maintenance_insights(
+    machine_id: str | None = None,
+    fault_code: str | None = None,
+) -> dict:
+    """Return historical insights built only from explicitly verified outcomes."""
+    store = VerifiedMaintenanceLearning(VERIFIED_MAINTENANCE_DB)
+    try:
+        return store.insights(machine_id=machine_id, fault_code=fault_code)
+    finally:
+        store.close()
+
 
 
 @router.get("/diagnose/history")
