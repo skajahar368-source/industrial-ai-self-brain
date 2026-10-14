@@ -109,7 +109,7 @@ The CI workflow runs the complete pytest suite on Python 3.11.
 - **Validation Center:** deliberately test normal, warning, failure, missing, duplicate, invalid, stale, and contradictory telemetry.
 - **V2.4:** integrate Self-Brain ML with telemetry-quality confidence and machine-specific baselines.
 - **V2.5:** persistent alarm history with SQLite, restart recovery, and persistence tests.
-- **V2.6:** continuous learning using verified maintenance outcomes and failure history.
+- **V2.6:** persist human-verified maintenance outcomes and summarize historical repair evidence without automatically retraining models.
 - **V3.x:** production-style deployment and real industrial data integration.
 - **Future:** PLC/SCADA/OPC-UA/MQTT/IIoT integrations, multi-machine intelligence, stronger RUL models, MLOps, explainability, and digital-twin workflows.
 
@@ -169,6 +169,43 @@ PYTHONPATH=. pytest -q tests/test_alarm_persistence.py
 ```
 
 The database is local application state. Back it up according to your deployment requirements; do not commit a live database containing operational records.
+
+
+### V2.6: Verified maintenance learning
+
+Record maintenance outcomes only after a qualified person has verified the repair result. The records are stored in SQLite at `data/verified_maintenance.sqlite3` by default; set `SELF_BRAIN_MAINTENANCE_DB` to override the path.
+
+- `POST /api/maintenance-learning/outcomes` records the fault, suspected/confirmed cause, repair action, success/failure, verifier, verification method, and result.
+- `GET /api/maintenance-learning/insights` summarizes verified cases by machine, fault code, and cause. Optional filters: `machine_id` and `fault_code`.
+- Outcomes missing required verification evidence—or explicitly marked `verified: false`—are rejected.
+- Insights label their source as `human_verified`; unverified AI suggestions are not included.
+- This milestone does **not** automatically retrain a model or turn a historical correlation into a confirmed cause. A human still reviews maintenance recommendations.
+- PLC access remains read-only; these endpoints only write Self-Brain's own maintenance-history database.
+
+Example payload:
+
+```json
+{
+  "event_timestamp": "2026-10-14T10:00:00Z",
+  "machine_id": "M-001",
+  "fault_code": "HIGH_VIBRATION",
+  "cause": "bearing wear",
+  "repair_action": "replace bearing",
+  "repair_successful": true,
+  "verified": true,
+  "verified_by": "maintenance-engineer",
+  "verification_method": "post-repair vibration measurement",
+  "verification_result": "vibration returned to baseline",
+  "before_evidence": "vibration high",
+  "after_evidence": "vibration normal"
+}
+```
+
+Run the focused tests:
+
+```bash
+PYTHONPATH=. pytest -q tests/test_verified_maintenance_learning.py
+```
 
 ## Testing
 
