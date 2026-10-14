@@ -1,3 +1,4 @@
+import os
 from pathlib import Path
 from typing import Any
 
@@ -23,6 +24,7 @@ from ml.failure_pattern_learning import (
 )
 from ml.part_lifecycle import active_part_life
 from ml.predictive_maintenance import maintenance_risk, score_dataframe
+from ml.alarm_manager import AlarmManager
 from ml.plc_gateway import PLCGateway
 from ml.virtual_plc import VirtualPLC
 from ml.replacement_workflow import validate_early_replacement
@@ -33,6 +35,8 @@ from ml.production_monitor import summarize_plc_snapshot, summarize_production
 
 _SELF_BRAIN: SelfBrainML | None = None
 _PLC_GATEWAYS: dict[str, PLCGateway] = {}
+ALARM_DB_PATH = Path(os.environ.get("SELF_BRAIN_ALARM_DB", "data/alarm_history.sqlite3"))
+_ALARM_MANAGER = AlarmManager(db_path=ALARM_DB_PATH)
 
 router = APIRouter(prefix="/api")
 DATA_PATH = Path("data/machine_data.csv")
@@ -51,7 +55,10 @@ def _get_plc_gateway(machine_id: str = "M-001", scenario: str | None = None) -> 
         raise ValueError("machine_id cannot be empty")
     gateway = _PLC_GATEWAYS.get(machine_id)
     if gateway is None:
-        gateway = PLCGateway(VirtualPLC(machine_id=machine_id, scenario=scenario or "normal"))
+        gateway = PLCGateway(
+            VirtualPLC(machine_id=machine_id, scenario=scenario or "normal"),
+            alarm_manager=_ALARM_MANAGER,
+        )
         _PLC_GATEWAYS[machine_id] = gateway
     elif scenario is not None:
         gateway.configure(scenario=scenario)
@@ -97,33 +104,13 @@ def plc_scan(payload: dict) -> dict:
 
 @router.get("/plc/alarms")
 def plc_alarms(machine_id: str | None = None) -> dict:
-    """Return alarm history observed from PLC snapshots; this endpoint is read-only."""
+    """Return persistent alarm history; this endpoint is read-only."""
     if machine_id is not None:
         machine_id = str(machine_id).strip()
         if not machine_id:
             return {"status": "rejected", "error": "machine_id cannot be empty"}
-        gateway = _PLC_GATEWAYS.get(machine_id)
-        if gateway is None:
-            return {
-                "status": "ok",
-                "count": 0,
-                "active_count": 0,
-                "alarms": [],
-                "read_only_to_plc": True,
-                "control_write_performed": False,
-            }
-        return gateway.alarm_manager.snapshot(machine_id=machine_id)
-    alarms = [gateway.alarm_manager.snapshot() for gateway in _PLC_GATEWAYS.values()]
-    records = [alarm for result in alarms for alarm in result["alarms"]]
-    active = sum(1 for alarm in records if alarm["active"])
-    return {
-        "status": "ok",
-        "count": len(records),
-        "active_count": active,
-        "alarms": sorted(records, key=lambda alarm: alarm["raised_at"], reverse=True),
-        "read_only_to_plc": True,
-        "control_write_performed": False,
-    }
+        return _ALARM_MANAGER.snapshot(machine_id=machine_id)
+    return _ALARM_MANAGER.snapshot()
 
 
 @router.post("/plc/alarms/acknowledge")
@@ -134,11 +121,13 @@ def plc_alarm_acknowledge(payload: dict) -> dict:
     acknowledged_by = str(payload.get("acknowledged_by", "")).strip()
     if not machine_id:
         return {"status": "rejected", "error": "machine_id cannot be empty"}
-    gateway = _PLC_GATEWAYS.get(machine_id)
-    if gateway is None:
-        return {"status": "rejected", "error": "machine_id has no alarm history"}
+    if not any(
+        alarm["alarm_id"] == alarm_id
+        for alarm in _ALARM_MANAGER.snapshot(machine_id=machine_id)["alarms"]
+    ):
+        return {"status": "rejected", "error": "alarm_id not found for machine_id"}
     try:
-        alarm = gateway.alarm_manager.acknowledge(alarm_id, acknowledged_by)
+        alarm = _ALARM_MANAGER.acknowledge(alarm_id, acknowledged_by)
         return {
             "status": "acknowledged",
             "alarm": alarm,
