@@ -131,6 +131,24 @@ Example acknowledgement payload:
 }
 ```
 
+### V2.4: Industrial Validation Lab
+
+Run the dedicated deterministic fault and stress scenarios:
+
+```bash
+PYTHONPATH=. pytest -q tests/industrial_validation
+```
+
+The suite covers:
+- normal baseline with no active alarm;
+- thermal, pressure, vibration, combined, and failure scenarios;
+- repeated-fault deduplication;
+- recovery and alarm clearing;
+- bounded alarm-history behavior under a 100-event stress sequence;
+- invalid alarm inputs.
+
+These checks exercise the simulation and software contract only. They do not establish real-machine prediction accuracy, production safety, or compatibility with a physical PLC.
+
 ## Testing
 
 Run locally:
