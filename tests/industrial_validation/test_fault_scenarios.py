@@ -41,16 +41,20 @@ def test_fault_scenarios_surface_alarm_evidence(scenario: str) -> None:
     assert result["control_write_performed"] is False
 
 
-def test_repeated_fault_does_not_duplicate_active_alarm() -> None:
-    gateway = PLCGateway(VirtualPLC("M-LAB-REPEAT", "combined"))
+def test_repeated_same_fault_does_not_duplicate_active_alarm() -> None:
+    # The failure scenario keeps a stable fault code across scans. The
+    # combined scenario intentionally changes code as severity increases,
+    # which correctly creates a new history entry for the changed fault.
+    gateway = PLCGateway(VirtualPLC("M-LAB-REPEAT", "failure"))
 
     first = gateway.scan()
     first_id = first["alarms"]["alarms"][0]["alarm_id"]
+    first_count = first["alarms"]["count"]
     for _ in range(20):
         result = gateway.scan()
 
     assert result["alarms"]["active_count"] == 1
-    assert result["alarms"]["count"] == 1
+    assert result["alarms"]["count"] == first_count
     assert result["alarms"]["alarms"][0]["alarm_id"] == first_id
     assert result["control_write_performed"] is False
 
