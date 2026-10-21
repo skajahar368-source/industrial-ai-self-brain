@@ -650,3 +650,50 @@ def self_brain_diagnose(payload: dict) -> dict:
         return result
     except (TypeError, ValueError) as exc:
         return {"status": "rejected", "error": str(exc)}
+
+
+@router.post("/maintenance-learning/diagnostic-context")
+def verified_maintenance_diagnostic_context(payload: dict) -> dict:
+    """Return matching verified repair history as context, never as an automatic diagnosis."""
+    machine_id = str(payload.get("machine_id", "")).strip()
+    fault_code = str(payload.get("fault_code", "")).strip().upper()
+    if not machine_id:
+        return {"status": "blocked", "error": "machine_id is required"}
+    if not fault_code:
+        return {"status": "blocked", "error": "fault_code is required"}
+
+    requested_causes = payload.get("causes", [])
+    if not isinstance(requested_causes, list) or any(
+        not isinstance(item, str) for item in requested_causes
+    ):
+        return {"status": "blocked", "error": "causes must be a list of strings"}
+
+    store = VerifiedMaintenanceLearning(VERIFIED_MAINTENANCE_DB)
+    try:
+        history = store.insights(machine_id=machine_id, fault_code=fault_code)
+    finally:
+        store.close()
+
+    normalized_causes = {item.strip().casefold() for item in requested_causes if item.strip()}
+    matching = [
+        item for item in history["insights"]
+        if not normalized_causes or item["cause"].strip().casefold() in normalized_causes
+    ]
+    return {
+        "status": "ok",
+        "machine_id": machine_id,
+        "fault_code": fault_code,
+        "matching_verified_cases": sum(item["verified_cases"] for item in matching),
+        "evidence_count": len(matching),
+        "evidence": matching,
+        "evidence_label": "human_verified_historical_context",
+        "interpretation": (
+            "Historical repair outcomes may help a qualified person investigate. "
+            "They do not prove the current fault's cause or guarantee repair success."
+            if matching else
+            "No matching verified maintenance history was found. Do not infer a cause from absent evidence."
+        ),
+        "automatic_diagnosis_performed": False,
+        "model_updated": False,
+        "control_write_performed": False,
+    }
