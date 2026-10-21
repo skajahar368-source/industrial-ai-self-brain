@@ -422,3 +422,28 @@ PYTHONPATH=. pytest -q
 ```
 
 The export contains current telemetry, evidence quality, deterministic rule findings, historical verified maintenance context, and safety limitations. It does not execute commands or write to PLC/SCADA controls.
+
+
+## V3.3 — Maintenance investigation history
+
+Successful reports from both investigation endpoints are now saved to a local SQLite history database. Each saved report receives a unique report ID and UTC archive timestamp.
+
+- `GET /api/maintenance/investigation-report/history` lists recent report summaries.
+- Add `?machine_id=M-001&limit=20` to filter by machine; limit must be between 1 and 100.
+- `GET /api/maintenance/investigation-report/history/{report_id}` retrieves the complete saved report.
+- Only successful reports are archived; blocked/error results are not saved.
+- Database path defaults to `data/maintenance_report_history.sqlite3`; set `SELF_BRAIN_REPORT_HISTORY_DB` to override it.
+
+Focused tests:
+
+```bash
+PYTHONPATH=. pytest -q tests/test_maintenance_investigation_report.py
+```
+
+Full suite:
+
+```bash
+PYTHONPATH=. pytest -q
+```
+
+History is a record of what the software reported at the time, not proof of a confirmed fault or repair. It performs no PLC/SCADA control writes and does not update models.
