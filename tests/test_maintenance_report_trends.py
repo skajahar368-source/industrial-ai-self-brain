@@ -56,3 +56,51 @@ def test_trends_require_machine_id_and_return_not_found_when_empty():
     result = summarize_report_trends([], "M-TREND")
     assert result["status"] == "not_found"
     assert result["human_review_required"] is True
+
+
+def test_trends_api_reads_archived_reports_from_sqlite(monkeypatch, tmp_path):
+    from app.api import routes
+    from ml.maintenance_report_history import save_report
+
+    db_path = tmp_path / "trend-history.sqlite3"
+    monkeypatch.setattr(routes, "MAINTENANCE_REPORT_HISTORY_DB", db_path)
+
+    def archived_report(health, risk_level, score, fault):
+        return {
+            "status": "ok",
+            "machine_id": "M-TREND",
+            "summary": {
+                "health_status": health,
+                "maintenance_risk_level": risk_level,
+                "maintenance_risk_score": score,
+                "fault_code": fault,
+                "anomaly_flagged": None,
+                "timestamp": "2026-10-21T12:00:00Z",
+            },
+            "evidence_quality": {"status": "available"},
+            "human_review_required": True,
+            "automatic_diagnosis_performed": False,
+            "model_updated": False,
+            "control_write_performed": False,
+            "plc_write_performed": False,
+        }
+
+    save_report(archived_report("warning", "medium", 40, "NORMAL"), db_path)
+    save_report(archived_report("critical", "high", 75, "HIGH_VIBRATION"), db_path)
+
+    result = routes.maintenance_investigation_report_trends(machine_id="M-TREND", limit=20)
+
+    assert result["status"] == "ok"
+    assert result["report_count"] == 2
+    assert result["comparison"]["maintenance_risk_score"]["delta"] == 35.0
+    assert result["comparison"]["fault_code"]["to"] == "HIGH_VIBRATION"
+    assert result["plc_write_performed"] is False
+
+
+def test_trends_api_requires_machine_id(monkeypatch):
+    from app.api import routes
+
+    result = routes.maintenance_investigation_report_trends(machine_id=None, limit=20)
+
+    assert result["status"] == "rejected"
+    assert result["error"] == "machine_id is required"
