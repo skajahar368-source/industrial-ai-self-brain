@@ -13,6 +13,7 @@ from ml.historical_diagnosis import diagnose_against_history
 from ml.industrial_assistant import ask_industrial_assistant
 from ml.maintenance_investigation_report import build_maintenance_investigation_report
 from ml.maintenance_report_history import get_report, list_reports, save_report
+from ml.maintenance_report_trends import summarize_report_trends
 from ml.telemetry_ingestion import ingest_batch, ingest_reading, recent_telemetry
 from ml.telemetry_quality import assess_telemetry_quality
 from ml.time_series_intelligence import analyze_trends
@@ -361,6 +362,28 @@ def maintenance_investigation_report_history(
 def maintenance_investigation_report_history_detail(report_id: str) -> dict:
     """Retrieve one complete archived maintenance report."""
     return get_report(report_id, MAINTENANCE_REPORT_HISTORY_DB)
+
+
+@router.get("/maintenance/investigation-report/trends")
+def maintenance_investigation_report_trends(
+    machine_id: str | None = None,
+    limit: int = 20,
+) -> dict:
+    """Compare recent archived reports for one machine; this is not a diagnosis."""
+    if machine_id is None or not str(machine_id).strip():
+        return {"status": "rejected", "error": "machine_id is required"}
+    history = list_reports(
+        MAINTENANCE_REPORT_HISTORY_DB,
+        machine_id=str(machine_id).strip(),
+        limit=limit,
+    )
+    if history.get("status") != "ok":
+        return history
+    full_reports = [
+        get_report(item["report_id"], MAINTENANCE_REPORT_HISTORY_DB)
+        for item in history["reports"]
+    ]
+    return summarize_report_trends(full_reports, str(machine_id).strip())
 
 
 @router.post("/maintenance/investigation-report/download")
