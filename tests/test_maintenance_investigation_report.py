@@ -119,3 +119,37 @@ def test_non_dictionary_assistant_result_is_blocked():
     report = build_maintenance_investigation_report(None)
     assert report["status"] == "blocked"
     assert report["error"] == "Assistant result must be an object."
+
+
+def test_download_endpoint_returns_json_attachment(monkeypatch):
+    import json
+
+    monkeypatch.setattr(routes, "ask_industrial_assistant", lambda payload: assistant_result())
+
+    response = routes.download_maintenance_investigation_report({
+        "machine_id": "M-REPORT",
+        "question": "Investigate the machine condition",
+    })
+
+    assert response.status_code == 200
+    assert response.media_type == "application/json"
+    assert response.headers["content-disposition"] == (
+        'attachment; filename="self-brain-maintenance-report-M-REPORT.json"'
+    )
+    downloaded = json.loads(response.body)
+    assert downloaded["report_version"] == "3.1"
+    assert downloaded["human_review_required"] is True
+    assert downloaded["plc_write_performed"] is False
+
+
+def test_download_endpoint_does_not_attach_blocked_report(monkeypatch):
+    monkeypatch.setattr(
+        routes,
+        "ask_industrial_assistant",
+        lambda payload: {"status": "blocked", "error": "machine_id is required"},
+    )
+
+    response = routes.download_maintenance_investigation_report({"question": "Investigate"})
+
+    assert response.status_code == 400
+    assert "content-disposition" not in response.headers
