@@ -47,7 +47,8 @@ def assistant_result():
     }
 
 
-def test_report_groups_sources_and_keeps_safety_boundaries(monkeypatch):
+def test_report_groups_sources_and_keeps_safety_boundaries(monkeypatch, tmp_path):
+    monkeypatch.setattr(routes, "MAINTENANCE_REPORT_HISTORY_DB", tmp_path / "reports.sqlite3")
     monkeypatch.setattr(routes, "ask_industrial_assistant", lambda payload: assistant_result())
 
     report = routes.maintenance_investigation_report({
@@ -121,9 +122,10 @@ def test_non_dictionary_assistant_result_is_blocked():
     assert report["error"] == "Assistant result must be an object."
 
 
-def test_download_endpoint_returns_json_attachment(monkeypatch):
+def test_download_endpoint_returns_json_attachment(monkeypatch, tmp_path):
     import json
 
+    monkeypatch.setattr(routes, "MAINTENANCE_REPORT_HISTORY_DB", tmp_path / "reports.sqlite3")
     monkeypatch.setattr(routes, "ask_industrial_assistant", lambda payload: assistant_result())
 
     response = routes.download_maintenance_investigation_report({
@@ -142,7 +144,8 @@ def test_download_endpoint_returns_json_attachment(monkeypatch):
     assert downloaded["plc_write_performed"] is False
 
 
-def test_download_endpoint_does_not_attach_blocked_report(monkeypatch):
+def test_download_endpoint_does_not_attach_blocked_report(monkeypatch, tmp_path):
+    monkeypatch.setattr(routes, "MAINTENANCE_REPORT_HISTORY_DB", tmp_path / "reports.sqlite3")
     monkeypatch.setattr(
         routes,
         "ask_industrial_assistant",
@@ -153,3 +156,59 @@ def test_download_endpoint_does_not_attach_blocked_report(monkeypatch):
 
     assert response.status_code == 400
     assert "content-disposition" not in response.headers
+
+
+
+def test_successful_report_is_archived_and_can_be_listed_and_retrieved(monkeypatch, tmp_path):
+    from ml.maintenance_report_history import get_report, list_reports
+
+    db_path = tmp_path / "reports.sqlite3"
+    monkeypatch.setattr(routes, "MAINTENANCE_REPORT_HISTORY_DB", db_path)
+    monkeypatch.setattr(routes, "ask_industrial_assistant", lambda payload: assistant_result())
+
+    created = routes.maintenance_investigation_report({
+        "machine_id": "M-REPORT",
+        "question": "Investigate the machine condition",
+    })
+
+    assert created["status"] == "ok"
+    assert created["history_saved"] is True
+    assert created["report_id"]
+    assert created["archived_at_utc"]
+
+    listing = list_reports(db_path, machine_id="M-REPORT")
+    assert listing["status"] == "ok"
+    assert listing["count"] == 1
+    assert listing["reports"][0]["report_id"] == created["report_id"]
+    assert listing["reports"][0]["fault_code"] == "HIGH_VIBRATION"
+
+    stored = get_report(created["report_id"], db_path)
+    assert stored["report_id"] == created["report_id"]
+    assert stored["summary"]["fault_code"] == "HIGH_VIBRATION"
+    assert stored["plc_write_performed"] is False
+
+
+def test_blocked_report_is_not_archived(monkeypatch, tmp_path):
+    from ml.maintenance_report_history import list_reports
+
+    db_path = tmp_path / "reports.sqlite3"
+    monkeypatch.setattr(routes, "MAINTENANCE_REPORT_HISTORY_DB", db_path)
+    monkeypatch.setattr(
+        routes,
+        "ask_industrial_assistant",
+        lambda payload: {"status": "blocked", "error": "machine_id is required"},
+    )
+
+    result = routes.maintenance_investigation_report({"question": "Investigate"})
+
+    assert result["status"] == "blocked"
+    assert list_reports(db_path)["count"] == 0
+
+
+def test_history_rejects_invalid_limit_and_reports_unknown_id(tmp_path):
+    from ml.maintenance_report_history import get_report, list_reports
+
+    db_path = tmp_path / "reports.sqlite3"
+    assert list_reports(db_path, limit=101)["status"] == "rejected"
+    missing = get_report("missing-report-id", db_path)
+    assert missing["status"] == "not_found"
