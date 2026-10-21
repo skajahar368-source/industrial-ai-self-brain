@@ -47,7 +47,8 @@ def assistant_result():
     }
 
 
-def test_report_groups_sources_and_keeps_safety_boundaries(monkeypatch):
+def test_report_groups_sources_and_keeps_safety_boundaries(monkeypatch, tmp_path):
+    monkeypatch.setattr(routes, "MAINTENANCE_REPORT_HISTORY_DB", tmp_path / "reports.sqlite3")
     monkeypatch.setattr(routes, "ask_industrial_assistant", lambda payload: assistant_result())
 
     report = routes.maintenance_investigation_report({
