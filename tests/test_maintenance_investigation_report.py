@@ -1,6 +1,7 @@
-"""V3.0 tests for structured maintenance investigation reports."""
+"""V3.1 tests for evidence quality in structured maintenance reports."""
 
 from app.api import routes
+from ml.maintenance_investigation_report import build_maintenance_investigation_report
 
 
 def assistant_result():
@@ -55,13 +56,16 @@ def test_report_groups_sources_and_keeps_safety_boundaries(monkeypatch):
     })
 
     assert report["status"] == "ok"
-    assert report["report_version"] == "3.0"
+    assert report["report_version"] == "3.1"
     assert report["summary"]["fault_code"] == "HIGH_VIBRATION"
     assert report["summary"]["maintenance_risk_level"] == "high"
     assert report["summary"]["anomaly_flagged"] is True
     assert report["evidence_sources"]["rule_based_findings"]["findings"][0]["cause"] == "Excessive vibration"
     assert report["evidence_sources"]["verified_maintenance_history"]["matching_verified_cases"] == 2
     assert report["recommended_checks"][0]["source"] == "deterministic_root_cause_rule"
+    assert report["evidence_quality"]["status"] == "available"
+    assert report["evidence_quality"]["numeric_measurement_count"] == 1
+    assert report["evidence_quality"]["recommended_check_count"] == 1
     assert report["human_review_required"] is True
     assert report["automatic_diagnosis_performed"] is False
     assert report["model_updated"] is False
@@ -83,8 +87,6 @@ def test_report_propagates_assistant_blocked_or_not_found_status(monkeypatch):
 
 
 def test_report_rejects_malformed_evidence():
-    from ml.maintenance_investigation_report import build_maintenance_investigation_report
-
     report = build_maintenance_investigation_report({
         "status": "ok",
         "machine_id": "M-REPORT",
@@ -93,3 +95,27 @@ def test_report_rejects_malformed_evidence():
 
     assert report["status"] == "blocked"
     assert "evidence must be an object" in report["error"]
+
+
+def test_missing_context_is_reported_and_unknown_anomaly_is_not_false():
+    result = assistant_result()
+    evidence = result["evidence"]
+    evidence["latest_reading"] = {"machine_id": "M-REPORT"}
+    evidence["anomaly"] = {}
+
+    report = build_maintenance_investigation_report(result)
+
+    assert report["status"] == "ok"
+    assert report["evidence_quality"]["status"] == "partial"
+    assert report["evidence_quality"]["missing_context"] == [
+        "reading_timestamp",
+        "fault_code",
+        "numeric_sensor_measurements",
+    ]
+    assert report["summary"]["anomaly_flagged"] is None
+
+
+def test_non_dictionary_assistant_result_is_blocked():
+    report = build_maintenance_investigation_report(None)
+    assert report["status"] == "blocked"
+    assert report["error"] == "Assistant result must be an object."
