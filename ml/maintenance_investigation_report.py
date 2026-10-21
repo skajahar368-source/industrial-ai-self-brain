@@ -8,13 +8,31 @@ from __future__ import annotations
 from typing import Any
 
 
+def _numeric_measurement_count(reading: dict[str, Any]) -> int:
+    """Count numeric telemetry fields without treating booleans as measurements."""
+    metadata = {"machine_id", "timestamp", "fault_code", "status", "scenario"}
+    return sum(
+        1
+        for key, value in reading.items()
+        if key not in metadata
+        and isinstance(value, (int, float))
+        and not isinstance(value, bool)
+    )
+
+
 def build_maintenance_investigation_report(assistant_result: dict[str, Any]) -> dict[str, Any]:
     """Transform an industrial-assistant response into a structured report."""
+    if not isinstance(assistant_result, dict):
+        return {"status": "blocked", "error": "Assistant result must be an object."}
+
     if assistant_result.get("status") != "ok":
         return {
             "status": assistant_result.get("status", "blocked"),
             "machine_id": assistant_result.get("machine_id"),
-            "error": assistant_result.get("error", assistant_result.get("answer", "Assistant could not produce evidence.")),
+            "error": assistant_result.get(
+                "error",
+                assistant_result.get("answer", "Assistant could not produce evidence."),
+            ),
         }
 
     evidence = assistant_result.get("evidence")
@@ -49,18 +67,40 @@ def build_maintenance_investigation_report(assistant_result: dict[str, Any]) -> 
                 "cause_label": str(finding.get("cause", "Potential contributing cause")),
             })
 
+    missing_context = []
+    if not reading.get("timestamp"):
+        missing_context.append("reading_timestamp")
+    if not reading.get("fault_code"):
+        missing_context.append("fault_code")
+    measurement_count = _numeric_measurement_count(reading)
+    if measurement_count == 0:
+        missing_context.append("numeric_sensor_measurements")
+    anomaly_label = anomaly.get("anomaly_label")
+    anomaly_flagged = None if anomaly_label is None else anomaly_label == -1
+
     return {
         "status": "ok",
-        "report_version": "3.0",
+        "report_version": "3.1",
         "machine_id": assistant_result.get("machine_id"),
         "question": assistant_result.get("question"),
         "summary": {
             "health_status": health.get("status", "unknown"),
             "maintenance_risk_level": risk.get("risk_level", "unknown"),
             "maintenance_risk_score": risk.get("maintenance_risk_score"),
-            "anomaly_flagged": anomaly.get("anomaly_label") == -1,
+            "anomaly_flagged": anomaly_flagged,
             "fault_code": reading.get("fault_code"),
             "timestamp": reading.get("timestamp"),
+        },
+        "evidence_quality": {
+            "status": "partial" if missing_context else "available",
+            "missing_context": missing_context,
+            "numeric_measurement_count": measurement_count,
+            "recommended_check_count": len(recommended_checks),
+            "note": (
+                "Missing context is reported explicitly; no confidence score is inferred."
+                if missing_context
+                else "Basic report context is present; this does not prove sensor accuracy."
+            ),
         },
         "evidence_sources": {
             "current_telemetry": {
@@ -94,6 +134,7 @@ def build_maintenance_investigation_report(assistant_result: dict[str, Any]) -> 
             "Rule-based findings are potential contributing causes, not confirmed diagnoses.",
             "Historical repairs may inform inspection but do not prove the current fault cause.",
             "This report does not establish real-machine model accuracy or production safety.",
+            "A present numeric measurement does not establish that the sensor is calibrated or healthy.",
         ],
         "human_review_required": True,
         "automatic_diagnosis_performed": False,
