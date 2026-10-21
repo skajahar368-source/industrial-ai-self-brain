@@ -298,3 +298,29 @@ Run the focused tests:
 PYTHONPATH=. pytest -q tests/test_maintenance_diagnostic_context.py
 ```
 
+
+
+## V2.9 — Verified evidence in the industrial assistant
+
+The industrial assistant now attaches human-verified maintenance records matching the current machine ID and fault code to its evidence payload. When available, its answer summarizes verified cases, successful repair counts, and recorded repair actions. When no matching records exist—or the reading has no usable fault code—it says so instead of guessing.
+
+- The context is labeled as historical evidence, not a diagnosis of the current fault.
+- Matching uses the exact machine ID and normalized fault code.
+- Evidence comes only from records explicitly marked human-verified.
+- No AI model is retrained or modified.
+- No PLC/SCADA control writes or machine commands are performed.
+- Configure the SQLite history location with `SELF_BRAIN_MAINTENANCE_DB` (default: `data/verified_maintenance.sqlite3`).
+
+Run V2.9 focused tests:
+
+```bash
+PYTHONPATH=. pytest -q tests/test_assistant_verified_maintenance_context.py
+```
+
+Then run the complete suite:
+
+```bash
+PYTHONPATH=. pytest -q
+```
+
+These tests validate software behavior with local/synthetic records. They do not establish production diagnostic accuracy or machine safety.
