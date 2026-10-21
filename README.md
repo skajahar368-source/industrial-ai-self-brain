@@ -257,3 +257,20 @@ reasoning, and runs Self-Brain ML diagnosis.
 
 This is a software validation environment. The telemetry is synthetic and does
 not represent measured limits or real-machine accuracy.
+
+
+## V2.7 verified-maintenance API validation
+
+API-level tests now exercise the verified-maintenance endpoints across separate route calls:
+- persist a verified repair outcome and read it back through the insights endpoint;
+- filter insights by machine and normalize fault-code filters;
+- reject unverified outcomes without adding them to historical evidence;
+- assert the API explicitly reports that no model update or PLC control write occurred.
+
+Run the focused API checks:
+
+```bash
+PYTHONPATH=. pytest -q tests/test_maintenance_learning_api.py
+```
+
+These tests validate the software contract only. They do not establish real-machine accuracy or production safety.
