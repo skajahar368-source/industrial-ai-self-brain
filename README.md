@@ -324,3 +324,36 @@ PYTHONPATH=. pytest -q
 ```
 
 These tests validate software behavior with local/synthetic records. They do not establish production diagnostic accuracy or machine safety.
+
+
+## V3.0 — Structured maintenance investigation report
+
+The new endpoint `POST /api/maintenance/investigation-report` turns the industrial assistant's existing evidence into a structured report with:
+- a machine-condition summary from the latest available reading;
+- health, maintenance-risk, and anomaly outputs;
+- deterministic root-cause rule findings and the checks suggested by those rules;
+- separately labeled human-verified maintenance history;
+- limitations and explicit human-review requirements.
+
+Example request:
+
+```json
+{
+  "machine_id": "M-001",
+  "question": "Investigate the current machine condition and what should maintenance inspect?"
+}
+```
+
+The report separates current telemetry, deterministic assessments, and historical verified repairs. It does not claim historical repairs prove the current cause, does not automatically diagnose, does not update a model, and does not write to PLC/SCADA controls. This endpoint is advisory and remains dependent on the quality of available machine data.
+
+Run V3.0 focused tests:
+
+```bash
+PYTHONPATH=. pytest -q tests/test_maintenance_investigation_report.py
+```
+
+Then run the full suite:
+
+```bash
+PYTHONPATH=. pytest -q
+```
