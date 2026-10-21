@@ -12,6 +12,7 @@ from ml.anomaly_detection import detect_anomalies
 from ml.historical_diagnosis import diagnose_against_history
 from ml.industrial_assistant import ask_industrial_assistant
 from ml.maintenance_investigation_report import build_maintenance_investigation_report
+from ml.maintenance_report_history import get_report, list_reports, save_report
 from ml.telemetry_ingestion import ingest_batch, ingest_reading, recent_telemetry
 from ml.telemetry_quality import assess_telemetry_quality
 from ml.time_series_intelligence import analyze_trends
@@ -41,6 +42,7 @@ _SELF_BRAIN: SelfBrainML | None = None
 _PLC_GATEWAYS: dict[str, PLCGateway] = {}
 ALARM_DB_PATH = Path(os.environ.get("SELF_BRAIN_ALARM_DB", "data/alarm_history.sqlite3"))
 VERIFIED_MAINTENANCE_DB = Path(os.environ.get("SELF_BRAIN_MAINTENANCE_DB", "data/verified_maintenance.sqlite3"))
+MAINTENANCE_REPORT_HISTORY_DB = Path(os.environ.get("SELF_BRAIN_REPORT_HISTORY_DB", "data/maintenance_report_history.sqlite3"))
 _ALARM_MANAGER = AlarmManager(db_path=ALARM_DB_PATH)
 
 router = APIRouter(prefix="/api")
@@ -338,9 +340,27 @@ def industrial_assistant(payload: dict) -> dict:
 
 @router.post("/maintenance/investigation-report")
 def maintenance_investigation_report(payload: dict) -> dict:
-    """Return a structured evidence report; this is advisory and performs no control writes."""
+    """Build and archive a structured report; advisory only, with no control writes."""
     assistant_result = ask_industrial_assistant(payload)
-    return build_maintenance_investigation_report(assistant_result)
+    report = build_maintenance_investigation_report(assistant_result)
+    if report.get("status") == "ok":
+        report.update(save_report(report, MAINTENANCE_REPORT_HISTORY_DB))
+    return report
+
+
+@router.get("/maintenance/investigation-report/history")
+def maintenance_investigation_report_history(
+    machine_id: str | None = None,
+    limit: int = 20,
+) -> dict:
+    """List archived maintenance report summaries."""
+    return list_reports(MAINTENANCE_REPORT_HISTORY_DB, machine_id=machine_id, limit=limit)
+
+
+@router.get("/maintenance/investigation-report/history/{report_id}")
+def maintenance_investigation_report_history_detail(report_id: str) -> dict:
+    """Retrieve one complete archived maintenance report."""
+    return get_report(report_id, MAINTENANCE_REPORT_HISTORY_DB)
 
 
 @router.post("/maintenance/investigation-report/download")
@@ -350,6 +370,7 @@ def download_maintenance_investigation_report(payload: dict) -> JSONResponse:
     report = build_maintenance_investigation_report(assistant_result)
     if report.get("status") != "ok":
         return JSONResponse(content=report, status_code=400)
+    report.update(save_report(report, MAINTENANCE_REPORT_HISTORY_DB))
 
     machine_id = str(report.get("machine_id") or "machine").strip()
     safe_machine_id = re.sub(r"[^A-Za-z0-9_-]+", "_", machine_id).strip("_") or "machine"
