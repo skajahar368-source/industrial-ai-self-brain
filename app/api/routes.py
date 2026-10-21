@@ -9,6 +9,7 @@ from app.services.health import evaluate_machine_health
 from ml.anomaly_detection import detect_anomalies
 from ml.historical_diagnosis import diagnose_against_history
 from ml.industrial_assistant import ask_industrial_assistant
+from ml.maintenance_investigation_report import build_maintenance_investigation_report
 from ml.telemetry_ingestion import ingest_batch, ingest_reading, recent_telemetry
 from ml.telemetry_quality import assess_telemetry_quality
 from ml.time_series_intelligence import analyze_trends
@@ -331,6 +332,13 @@ def failure_prediction(payload: dict) -> dict:
 @router.post("/assistant/ask")
 def industrial_assistant(payload: dict) -> dict:
     return ask_industrial_assistant(payload)
+
+
+@router.post("/maintenance/investigation-report")
+def maintenance_investigation_report(payload: dict) -> dict:
+    """Return a structured evidence report; this is advisory and performs no control writes."""
+    assistant_result = ask_industrial_assistant(payload)
+    return build_maintenance_investigation_report(assistant_result)
 
 
 @router.get("/validation/run")
