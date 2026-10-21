@@ -274,3 +274,27 @@ PYTHONPATH=. pytest -q tests/test_maintenance_learning_api.py
 ```
 
 These tests validate the software contract only. They do not establish real-machine accuracy or production safety.
+
+
+## V2.8 — Evidence-grounded diagnostic context
+
+The endpoint `POST /api/maintenance-learning/diagnostic-context` returns matching human-verified maintenance history for a machine and fault code, with an optional list of candidate causes to filter by. The response labels records as historical context and explicitly states that history does not prove the current fault's cause.
+
+Example request:
+
+```json
+{
+  "machine_id": "M-001",
+  "fault_code": "HIGH_VIBRATION",
+  "causes": ["bearing wear"]
+}
+```
+
+The response includes matching verified cases, successful repair counts/rates, evidence labels, and an interpretation that warns when no matching evidence exists. It does not generate a diagnosis, update a model, or write to PLC controls.
+
+Run the focused tests:
+
+```bash
+PYTHONPATH=. pytest -q tests/test_maintenance_diagnostic_context.py
+```
+
