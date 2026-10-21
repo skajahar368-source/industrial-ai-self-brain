@@ -447,3 +447,30 @@ PYTHONPATH=. pytest -q
 ```
 
 History is a record of what the software reported at the time, not proof of a confirmed fault or repair. It performs no PLC/SCADA control writes and does not update models.
+
+
+## V3.4 — Maintenance report trend comparison
+
+V3.4 adds a deterministic comparison of archived reports for one machine:
+
+- `GET /api/maintenance/investigation-report/trends?machine_id=M-001&limit=20`
+- `machine_id` is required; `limit` must be between 1 and 100.
+- Compares oldest and newest available reports for health status, risk level, numeric risk-score change (when both scores exist), fault code, and anomaly flag.
+- Returns the selected reports in chronological order and lists distinct fault-code labels observed.
+- Missing numeric values are marked as not comparable; they are never estimated.
+- Empty history returns `not_found`; invalid inputs return `rejected`.
+
+Focused tests:
+
+```bash
+PYTHONPATH=. pytest -q tests/test_maintenance_report_trends.py
+PYTHONPATH=. pytest -q tests/test_maintenance_investigation_report.py
+```
+
+Full suite:
+
+```bash
+PYTHONPATH=. pytest -q
+```
+
+The trend summary describes changes in archived report fields only. It does not claim that one condition caused another, does not diagnose the machine, does not retrain models, and performs no PLC/SCADA control writes. Human maintenance review remains required.
