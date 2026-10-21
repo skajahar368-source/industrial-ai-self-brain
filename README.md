@@ -392,3 +392,33 @@ PYTHONPATH=. pytest -q
 ```
 
 Tests verify software behavior with local or synthetic records only. They do not prove sensor calibration, real-machine diagnostic accuracy, or production safety.
+
+
+## V3.2 — Downloadable maintenance investigation report
+
+The existing JSON endpoint remains available at POST /api/maintenance/investigation-report. V3.2 adds POST /api/maintenance/investigation-report/download, which returns the same structured report as a downloadable JSON attachment named for the machine ID.
+
+Example request body:
+
+```json
+{
+  "machine_id": "M-001",
+  "question": "Investigate the current machine condition and what should maintenance inspect?"
+}
+```
+
+Use the download endpoint in the API docs at /docs and save the response as a .json file. If the assistant cannot produce a report, the endpoint returns a structured error with HTTP 400 rather than an attachment.
+
+Focused tests:
+
+```bash
+PYTHONPATH=. pytest -q tests/test_maintenance_investigation_report.py
+```
+
+Full suite:
+
+```bash
+PYTHONPATH=. pytest -q
+```
+
+The export contains current telemetry, evidence quality, deterministic rule findings, historical verified maintenance context, and safety limitations. It does not execute commands or write to PLC/SCADA controls.

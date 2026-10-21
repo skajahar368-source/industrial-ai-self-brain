@@ -1,9 +1,11 @@
 import os
+import re
 from pathlib import Path
 from typing import Any
 
 import pandas as pd
 from fastapi import APIRouter
+from fastapi.responses import JSONResponse
 
 from app.services.health import evaluate_machine_health
 from ml.anomaly_detection import detect_anomalies
@@ -339,6 +341,23 @@ def maintenance_investigation_report(payload: dict) -> dict:
     """Return a structured evidence report; this is advisory and performs no control writes."""
     assistant_result = ask_industrial_assistant(payload)
     return build_maintenance_investigation_report(assistant_result)
+
+
+@router.post("/maintenance/investigation-report/download")
+def download_maintenance_investigation_report(payload: dict) -> JSONResponse:
+    """Return the structured report as a downloadable JSON attachment."""
+    assistant_result = ask_industrial_assistant(payload)
+    report = build_maintenance_investigation_report(assistant_result)
+    if report.get("status") != "ok":
+        return JSONResponse(content=report, status_code=400)
+
+    machine_id = str(report.get("machine_id") or "machine").strip()
+    safe_machine_id = re.sub(r"[^A-Za-z0-9_-]+", "_", machine_id).strip("_") or "machine"
+    filename = f"self-brain-maintenance-report-{safe_machine_id}.json"
+    return JSONResponse(
+        content=report,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
 
 
 @router.get("/validation/run")
