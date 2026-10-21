@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -13,6 +14,7 @@ from ml.predictive_maintenance import maintenance_risk
 from ml.root_cause import analyze_root_causes
 from ml.spare_management import analyze_inventory
 from ml.telemetry_ingestion import recent_telemetry
+from ml.verified_maintenance_learning import VerifiedMaintenanceLearning
 
 MACHINE_DATA_PATH = Path("data/machine_data.csv")
 SPARES_PATH = Path("data/spare_parts.csv")
@@ -61,6 +63,41 @@ def _question_intent(question: str) -> str:
     return "overview"
 
 
+def _verified_maintenance_context(machine_id: str, fault_code: Any) -> dict[str, Any]:
+    """Load verified history for this exact machine/fault; never infer a diagnosis."""
+    normalized_fault = str(fault_code or "").strip().upper()
+    base = {
+        "evidence_label": "human_verified_historical_context",
+        "evidence_count": 0,
+        "matching_verified_cases": 0,
+        "evidence": [],
+        "automatic_diagnosis_performed": False,
+        "model_updated": False,
+        "control_write_performed": False,
+    }
+    if not normalized_fault or normalized_fault in {"NONE", "NAN", "UNKNOWN"}:
+        base["interpretation"] = "No usable fault code is present, so verified maintenance history was not matched."
+        return base
+
+    db_path = Path(os.environ.get("SELF_BRAIN_MAINTENANCE_DB", "data/verified_maintenance.sqlite3"))
+    store = VerifiedMaintenanceLearning(db_path)
+    try:
+        insights = store.insights(machine_id=machine_id, fault_code=normalized_fault)
+    finally:
+        store.close()
+
+    evidence = insights["insights"]
+    base["evidence"] = evidence
+    base["evidence_count"] = len(evidence)
+    base["matching_verified_cases"] = sum(item["verified_cases"] for item in evidence)
+    base["interpretation"] = (
+        "Past verified repairs may help guide inspection, but they do not prove the current fault's cause."
+        if evidence else
+        "No matching verified maintenance history was found. Do not infer a cause from absent evidence."
+    )
+    return base
+
+
 def ask_industrial_assistant(payload: dict[str, Any]) -> dict[str, Any]:
     machine_id = str(payload.get("machine_id", "")).strip()
     question = str(payload.get("question", "")).strip()
@@ -94,6 +131,7 @@ def ask_industrial_assistant(payload: dict[str, Any]) -> dict[str, Any]:
     )
 
     history = _maintenance_history(machine_id)
+    verified_context = _verified_maintenance_context(machine_id, reading.get("fault_code"))
     intent = _question_intent(question)
 
     context: dict[str, Any] = {
@@ -104,6 +142,7 @@ def ask_industrial_assistant(payload: dict[str, Any]) -> dict[str, Any]:
         "root_cause": root_cause,
         "failure_pattern": pattern,
         "maintenance_event_count": int(len(history)),
+        "verified_maintenance_context": verified_context,
     }
 
     if intent == "history":
@@ -157,6 +196,23 @@ def ask_industrial_assistant(payload: dict[str, Any]) -> dict[str, Any]:
     else:
         answer_lines.append("No strong historical failure pattern is established from current evidence.")
 
+    verified_summaries = []
+    for item in verified_context["evidence"]:
+        actions = ", ".join(item["repair_actions"]) or "not recorded"
+        verified_summaries.append(
+            f'{item["cause"]}: {item["verified_cases"]} verified case(s), '
+            f'{item["successful_repairs"]} successful repair(s); actions: {actions}'
+        )
+    if verified_summaries:
+        answer_lines.append(
+            "Verified historical maintenance evidence (not a current diagnosis): "
+            + "; ".join(verified_summaries) + "."
+        )
+    else:
+        answer_lines.append(
+            "Verified historical maintenance evidence: none matched this machine and fault code."
+        )
+
     if intent == "spares":
         analyzed = analyze_inventory(pd.read_csv(SPARES_PATH))
         alerts = analyzed[analyzed["status"].isin(["out_of_stock", "reorder", "low"])]
@@ -179,6 +235,7 @@ def ask_industrial_assistant(payload: dict[str, Any]) -> dict[str, Any]:
     if intent == "history":
         answer_lines.append(f"Recorded maintenance events for this machine: {len(history)}.")
 
+    answer_lines.append(verified_context["interpretation"])
     answer_lines.append(
         "Decision: use this evidence to guide inspection; a human maintenance decision remains final."
     )
