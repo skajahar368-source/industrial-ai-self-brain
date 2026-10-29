@@ -14,6 +14,7 @@ from ml.validation_center import run_validation_suite
 from ml.degradation_timeline import build_degradation_timeline
 from ml.telemetry_simulator import generate_batch, generate_reading
 from ml.virtual_plc import build_virtual_plc_snapshot
+from ml.virtual_plc_diagnosis import diagnose_virtual_plc_reading
 from ml.failure_prediction_service import predict_latest, train_failure_predictor
 from ml.failure_pattern_learning import (
     build_failure_patterns,
@@ -81,6 +82,30 @@ def virtual_plc_snapshot(
     try:
         reading = generate_reading(machine_id=machine_id, step=step, scenario=scenario)
         return build_virtual_plc_snapshot(reading)
+    except (TypeError, ValueError) as exc:
+        return {"status": "rejected", "error": str(exc)}
+
+
+@router.get("/virtual-plc/diagnose")
+def virtual_plc_diagnose(
+    machine_id: str = "M-001",
+    step: int = 0,
+    scenario: str = "normal",
+) -> dict:
+    """Return a simulated PLC snapshot plus deterministic advisory findings."""
+    try:
+        reading = generate_reading(machine_id=machine_id, step=step, scenario=scenario)
+        snapshot = build_virtual_plc_snapshot(reading)
+        diagnosis = diagnose_virtual_plc_reading(reading)
+        return {
+            "status": "ok",
+            "snapshot": snapshot,
+            "diagnosis": diagnosis,
+            "analysis_is_ai_generated": False,
+            "read_only": True,
+            "real_plc_connected": False,
+            "write_commands_supported": False,
+        }
     except (TypeError, ValueError) as exc:
         return {"status": "rejected", "error": str(exc)}
 
