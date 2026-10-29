@@ -81,6 +81,13 @@ Telemetry quality checks are intentionally separated from machine-health scoring
 
 The validation contract distinguishes an expected rejection from an unexpected `ValueError`, so invalid-input tests cannot pass merely because an exception occurred.
 
+### Virtual PLC simulation (read-only)
+- `GET /api/virtual-plc/snapshot?machine_id=M-001&step=10&scenario=warning` returns a deterministic, simulated PLC-style tag snapshot.
+- Includes machine state, alarm state, sensor tags, and illustrative register addresses.
+- Explicitly reports `real_plc_connected: false` and `write_commands_supported: false`.
+- Supports `normal`, `warning`, and `failure` simulation scenarios.
+- This endpoint is read-only and never sends commands to real PLCs or machinery.
+
 ## Validation status
 
 The project has an automated end-to-end validation path covering:
