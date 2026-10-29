@@ -57,7 +57,7 @@ def build_virtual_plc_snapshot(reading: dict[str, Any]) -> dict[str, Any]:
     if fault_code == "NONE":
         machine_state = "RUNNING"
         alarm_state = "CLEAR"
-    elif fault_code.startswith("WARN"):
+    elif fault_code.startswith("WARN") or fault_code == "HIGH_TEMP":
         machine_state = "DEGRADED"
         alarm_state = "WARNING"
     else:
