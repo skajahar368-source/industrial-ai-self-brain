@@ -2,6 +2,8 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 
 from app.api.routes import router
+from app.api.virtual_plc_routes import router as virtual_plc_router
+from app.api.self_brain_explain_routes import router as self_brain_explain_router
 
 app = FastAPI(
     title="Industrial AI — Self-Brain",
@@ -10,6 +12,8 @@ app = FastAPI(
 )
 
 app.include_router(router)
+app.include_router(virtual_plc_router)
+app.include_router(self_brain_explain_router)
 app.mount("/dashboard", StaticFiles(directory="dashboard", html=True), name="dashboard")
 
 

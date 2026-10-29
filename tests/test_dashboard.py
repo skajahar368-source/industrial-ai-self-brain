@@ -80,3 +80,52 @@ def test_failure_prediction_endpoint_requires_training_or_predicts():
     assert body["status"] == "predicted"
     assert 0 <= body["failure_probability"] <= 1
     assert body["human_decision_required"] is True
+
+
+def test_virtual_plc_snapshot_is_simulated_and_read_only():
+    response = client.get(
+        "/api/virtual-plc/snapshot",
+        params={"machine_id": "M-PLC-API", "step": 10, "scenario": "failure"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["machine_id"] == "M-PLC-API"
+    assert body["machine_state"] == "FAULT"
+    assert body["alarm_state"] == "ACTIVE"
+    assert body["read_only"] is True
+    assert body["real_plc_connected"] is False
+    assert body["write_commands_supported"] is False
+
+
+def test_virtual_plc_snapshot_rejects_unknown_scenario():
+    response = client.get(
+        "/api/virtual-plc/snapshot",
+        params={"scenario": "unknown"},
+    )
+    assert response.status_code == 200
+    assert response.json()["status"] == "rejected"
+
+
+
+def test_virtual_plc_diagnose_is_rule_based_and_read_only():
+    response = client.get(
+        "/api/virtual-plc/diagnose",
+        params={"machine_id": "M-DIAG-01", "step": 10, "scenario": "failure"},
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert body["status"] == "ok"
+    assert body["analysis_is_ai_generated"] is False
+    assert body["read_only"] is True
+    assert body["real_plc_connected"] is False
+    assert body["write_commands_supported"] is False
+    assert body["diagnosis"]["analysis_type"] == "deterministic_rules"
+    assert body["diagnosis"]["severity"] == "high"
+    assert body["diagnosis"]["human_decision_required"] is True
+
+
+def test_virtual_plc_diagnose_rejects_unknown_scenario():
+    response = client.get("/api/virtual-plc/diagnose", params={"scenario": "unknown"})
+    assert response.status_code == 200
+    assert response.json()["status"] == "rejected"

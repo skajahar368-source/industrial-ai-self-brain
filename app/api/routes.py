@@ -13,6 +13,8 @@ from ml.time_series_intelligence import analyze_trends
 from ml.validation_center import run_validation_suite
 from ml.degradation_timeline import build_degradation_timeline
 from ml.telemetry_simulator import generate_batch, generate_reading
+from ml.virtual_plc import build_virtual_plc_snapshot
+from ml.virtual_plc_diagnosis import diagnose_virtual_plc_reading
 from ml.failure_prediction_service import predict_latest, train_failure_predictor
 from ml.failure_pattern_learning import (
     build_failure_patterns,
@@ -70,8 +72,353 @@ def telemetry_ingest_batch(payload: list[dict]) -> dict:
     return ingest_batch(payload)
 
 
+@router.get("/virtual-plc/snapshot")
+def virtual_plc_snapshot(
+    machine_id: str = "M-001",
+    step: int = 0,
+    scenario: str = "normal",
+) -> dict:
+    """Return simulated PLC-style tags only; this endpoint cannot write to a PLC."""
+    try:
+        reading = generate_reading(machine_id=machine_id, step=step, scenario=scenario)
+        return build_virtual_plc_snapshot(reading)
+    except (TypeError, ValueError) as exc:
+        return {"status": "rejected", "error": str(exc)}
+
+
+@router.get("/virtual-plc/diagnose")
+def virtual_plc_diagnose(
+    machine_id: str = "M-001",
+    step: int = 0,
+    scenario: str = "normal",
+) -> dict:
+    """Return a simulated PLC snapshot plus deterministic advisory findings."""
+    try:
+        reading = generate_reading(machine_id=machine_id, step=step, scenario=scenario)
+        snapshot = build_virtual_plc_snapshot(reading)
+        diagnosis = diagnose_virtual_plc_reading(reading)
+        return {
+            "status": "ok",
+            "snapshot": snapshot,
+            "diagnosis": diagnosis,
+            "analysis_is_ai_generated": False,
+            "read_only": True,
+            "real_plc_connected": False,
+            "write_commands_supported": False,
+        }
+    except (TypeError, ValueError) as exc:
+        return {"status": "rejected", "error": str(exc)}
+
+
 @router.post("/telemetry/simulate")
 def telemetry_simulate(payload: dict) -> dict:
+    try:
+        reading = generate_reading(
+            machine_id=str(payload.get("machine_id", "M-001")),
+            step=int(payload.get("step", 0)),
+            scenario=str(payload.get("scenario", "normal")),
+            interval_seconds=int(payload.get("interval_seconds", 5)),
+        )
+        return ingest_reading(reading)
+    except (TypeError, ValueError) as exc:
+        return {"status": "rejected", "error": str(exc)}
+
+
+@router.post("/telemetry/simulate-batch")
+def telemetry_simulate_batch(payload: dict) -> dict:
+    try:
+        readings = generate_batch(
+            machine_id=str(payload.get("machine_id", "M-001")),
+            start_step=int(payload.get("start_step", 0)),
+            count=int(payload.get("count", 10)),
+            scenario=str(payload.get("scenario", "normal")),
+            interval_seconds=int(payload.get("interval_seconds", 5)),
+        )
+        return ingest_batch(readings)
+    except (TypeError, ValueError) as exc:
+        return {"status": "rejected", "error": str(exc)}
+
+
+@router.get("/telemetry")
+def telemetry(machine_id: str | None = None, limit: int = 20) -> dict:
+    try:
+        records = recent_telemetry(machine_id=machine_id, limit=limit)
+    except ValueError as exc:
+        return {"status": "rejected", "error": str(exc)}
+    return {"count": len(records), "telemetry": records}
+
+
+@router.post("/failure-model/train")
+def failure_model_train() -> dict:
+    try:
+        return train_failure_predictor()
+    except ValueError as exc:
+        return {"status": "rejected", "error": str(exc)}
+
+
+@router.post("/failure-prediction")
+def failure_prediction(payload: dict) -> dict:
+    return predict_latest(payload)
+
+
+@router.post("/assistant/ask")
+def industrial_assistant(payload: dict) -> dict:
+    return ask_industrial_assistant(payload)
+
+
+@router.get("/validation/run")
+def validation_run() -> dict:
+    """Run the deterministic software validation suite without storing telemetry."""
+    return run_validation_suite()
+
+
+@router.get("/dashboard/overview")
+def dashboard_overview(machine_id: str = "M-001") -> dict:
+    """Return one read-only snapshot for the dashboard control room."""
+    telemetry_records = recent_telemetry(machine_id=machine_id, limit=20)
+    trend_analysis = analyze_trends(telemetry_records)
+    degradation_timeline = build_degradation_timeline(telemetry_records)
+    if telemetry_records:
+        latest = telemetry_records[0]
+    else:
+        source = pd.read_csv(DATA_PATH)
+        machine_rows = source[source["machine_id"] == machine_id]
+        if machine_rows.empty:
+            return {"status": "not_found", "machine_id": machine_id}
+        latest = machine_rows.sort_values("timestamp", ascending=False).iloc[0].to_dict()
+
+    health = evaluate_machine_health(latest)
+    risk = maintenance_risk(latest)
+    baseline = pd.read_csv(DATA_PATH)
+    anomaly = detect_anomalies(baseline)
+    machine_anomalies = anomaly[anomaly["machine_id"] == machine_id]
+    latest_anomaly = (
+        machine_anomalies.sort_values("timestamp", ascending=False).iloc[0].to_dict()
+        if not machine_anomalies.empty
+        else {}
+    )
+    root_cause = analyze_root_causes(latest)
+    spare_df = analyze_inventory(pd.read_csv(SPARES_PATH))
+    spare_alerts_df = spare_df[spare_df["status"].isin(["out_of_stock", "reorder", "low"])]
+
+    return {
+        "status": "ok",
+        "machine_id": machine_id,
+        "latest_telemetry": latest,
+        "health": health,
+        "maintenance_risk": risk,
+        "anomaly": {
+            "anomaly_label": latest_anomaly.get("anomaly_label"),
+            "anomaly_score": latest_anomaly.get("anomaly_score"),
+            "status": "anomalous" if latest_anomaly.get("anomaly_label") == -1 else "normal",
+        },
+        "root_cause": root_cause,
+        "spare_alerts": spare_alerts_df[
+            ["spare_id", "part_name", "status", "stock_quantity", "critical", "action"]
+        ].to_dict(orient="records"),
+        "recent_telemetry": telemetry_records[:10],
+        "trend_analysis": trend_analysis,
+        "degradation_timeline": degradation_timeline,
+    }
+
+
+@router.post("/machine-health")
+def machine_health(payload: dict) -> dict:
+    return evaluate_machine_health(payload)
+
+
+@router.post("/maintenance-risk")
+def maintenance_risk_api(payload: dict) -> dict:
+    return maintenance_risk(payload)
+
+
+@router.get("/maintenance-risk")
+def maintenance_risk_history() -> dict:
+    df = pd.read_csv(DATA_PATH)
+    scored = score_dataframe(df)
+    records = scored[["timestamp", "machine_id", "maintenance_risk_score", "risk_level"]].to_dict(orient="records")
+    return {"count": len(records), "maintenance_risk": records}
+
+
+@router.get("/anomalies")
+def anomalies() -> dict:
+    df = pd.read_csv(DATA_PATH)
+    scored = detect_anomalies(df)
+    records = scored[["timestamp", "machine_id", "anomaly_label", "anomaly_score"]].to_dict(orient="records")
+    return {"count": len(records), "anomalies": records}
+
+
+@router.post("/root-cause")
+def root_cause(payload: dict) -> dict:
+    return analyze_root_causes(payload)
+
+
+@router.get("/root-cause")
+def root_cause_history() -> dict:
+    df = pd.read_csv(DATA_PATH)
+    records = []
+    for row in df.to_dict(orient="records"):
+        analysis = analyze_root_causes(row)
+        records.append(
+            {
+                "timestamp": row.get("timestamp"),
+                "machine_id": row.get("machine_id"),
+                "fault_code": row.get("fault_code"),
+                "status": analysis["status"],
+                "cause_count": analysis["cause_count"],
+                "priority": analysis.get("priority", "none"),
+                "causes": [cause["cause"] for cause in analysis["causes"]],
+            }
+        )
+    return {"count": len(records), "root_cause_analysis": records}
+
+
+@router.post("/diagnose")
+def diagnose(payload: dict) -> dict:
+    return diagnose_against_history(payload)
+
+
+@router.get("/failure-patterns")
+def failure_patterns(machine_id: str | None = None) -> dict:
+    patterns = build_failure_patterns(machine_id)
+    return {"count": len(patterns), "patterns": patterns}
+
+
+@router.post("/failure-patterns/learn")
+def failure_pattern_learning(payload: dict) -> dict:
+    return learn_failure_pattern(payload)
+
+
+@router.post("/failure-patterns/outcomes")
+def failure_pattern_outcome(payload: dict) -> dict:
+    return record_learning_outcome(payload)
+
+
+@router.get("/failure-patterns/summary")
+def failure_pattern_summary() -> dict:
+    return summarize_learning_outcomes()
+
+
+@router.get("/diagnose/history")
+def diagnosis_history() -> dict:
+    history = pd.read_csv(Path("data/maintenance_history.csv"))
+    records = history.sort_values("timestamp", ascending=False).head(20).to_dict(orient="records")
+    return {"count": len(records), "maintenance_history": records}
+
+
+@router.get("/part-lifecycle/{machine_id}")
+def part_lifecycle(machine_id: str, runtime_hours: float, production_cycles: float, as_of: str | None = None) -> dict:
+    parts = active_part_life(
+        machine_id=machine_id,
+        current_runtime_hours=runtime_hours,
+        current_production_cycles=production_cycles,
+        as_of=as_of,
+    )
+    return {"machine_id": machine_id, "count": len(parts), "parts": parts}
+
+
+@router.post("/part-replacements")
+def record_part_replacement(payload: dict) -> dict:
+    required = [
+        "replacement_id", "machine_id", "part_id", "part_name", "installed_date",
+        "runtime_hours_at_install", "production_cycles_at_install",
+        "life_runtime_hours", "life_production_cycles", "life_calendar_days",
+    ]
+    missing = [field for field in required if field not in payload]
+    if missing:
+        return {"error": "Missing required fields", "fields": missing}
+
+    if payload.get("early_replacement", False):
+        validation = validate_early_replacement(payload)
+        if validation["status"] == "blocked":
+            return validation
+        payload = {**payload, **validation}
+
+    history = pd.read_csv(PART_HISTORY_PATH)
+    new_row = pd.DataFrame([payload])
+    history = pd.concat([history, new_row], ignore_index=True)
+    history.to_csv(PART_HISTORY_PATH, index=False)
+    return {"status": "recorded", "replacement": payload}
+
+
+@router.post("/part-replacement/validate")
+def validate_part_replacement(payload: dict) -> dict:
+    return validate_early_replacement(payload)
+
+
+@router.get("/spares")
+def spares() -> dict:
+    df = pd.read_csv(SPARES_PATH)
+    analyzed = analyze_inventory(df)
+    columns = [
+        "spare_id", "part_name", "machine_type", "stock_quantity",
+        "minimum_stock", "reorder_point", "monthly_usage", "lead_time_days",
+        "unit_cost", "supplier", "critical", "status", "months_of_stock", "action",
+    ]
+    return {"count": len(analyzed), "spares": analyzed[columns].to_dict(orient="records")}
+
+
+@router.get("/spares/alerts")
+def spare_alerts() -> dict:
+    df = pd.read_csv(SPARES_PATH)
+    analyzed = analyze_inventory(df)
+    alerts = analyzed[analyzed["status"].isin(["out_of_stock", "reorder", "low"])]
+    columns = ["spare_id", "part_name", "machine_type", "stock_quantity", "status", "critical", "action"]
+    return {"count": len(alerts), "alerts": alerts[columns].to_dict(orient="records")}
+
+
+@router.post("/spares/recommendation")
+def spare_recommendation(payload: dict) -> dict:
+    return spare_status(payload)
+
+
+@router.post("/self-brain/train")
+def self_brain_train() -> dict:
+    global _SELF_BRAIN
+    try:
+        _SELF_BRAIN = SelfBrainML()
+        metrics = _SELF_BRAIN.train()
+        return {"status": "trained", "model": "machine_self_brain", "metrics": metrics}
+    except (TypeError, ValueError) as exc:
+        _SELF_BRAIN = None
+        return {"status": "rejected", "error": str(exc)}
+
+
+@router.get("/self-brain/status")
+def self_brain_status() -> dict:
+    if _SELF_BRAIN is None:
+        return {"trained": False, "metrics": None}
+    return _SELF_BRAIN.status()
+
+
+@router.post("/self-brain/diagnose")
+def self_brain_diagnose(payload: dict) -> dict:
+    global _SELF_BRAIN
+    readings = payload.get("readings", [])
+    if not isinstance(readings, list):
+        return {"status": "rejected", "error": "readings must be a list"}
+    try:
+        quality = assess_telemetry_quality(
+            readings,
+            reference_time=payload.get("reference_time"),
+            stale_after_seconds=int(payload.get("stale_after_seconds", 60)),
+        )
+        blocking = {"invalid_timestamp", "missing_sensor"}
+        blocking_issues = [issue for issue in quality["issues"] if issue["type"] in blocking]
+        if blocking_issues:
+            return {
+                "status": "rejected",
+                "reason": "telemetry_quality",
+                "quality": quality,
+            }
+        if _SELF_BRAIN is None:
+            _SELF_BRAIN = SelfBrainML()
+            _SELF_BRAIN.train()
+        result = _SELF_BRAIN.diagnose(readings, machine_id=payload.get("machine_id"))
+        result["telemetry_quality"] = quality
+        return result
+    except (TypeError, ValueError) as exc:
+        return {"status": "rejected", "error": str(exc)}
     try:
         reading = generate_reading(
             machine_id=str(payload.get("machine_id", "M-001")),
