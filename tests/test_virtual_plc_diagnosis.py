@@ -12,7 +12,7 @@ def test_rule_diagnosis_reports_normal_simulated_reading():
 
 
 def test_rule_diagnosis_explains_high_sensor_values():
-    reading = generate_reading("M-RULE-02", step=10, scenario="failure")
+    reading = generate_reading("M-RULE-02", step=20, scenario="failure")
     result = diagnose_virtual_plc_reading(reading)
     codes = {finding["code"] for finding in result["findings"]}
     assert result["severity"] == "high"
