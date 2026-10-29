@@ -87,6 +87,8 @@ The validation contract distinguishes an expected rejection from an unexpected `
 - Explicitly reports `real_plc_connected: false` and `write_commands_supported: false`.
 - Supports `normal`, `warning`, and `failure` simulation scenarios.
 - This endpoint is read-only and never sends commands to real PLCs or machinery.
+- `GET /api/virtual-plc/diagnose?machine_id=M-001&step=10&scenario=failure` returns the same simulated snapshot plus explainable, deterministic rule-based findings.
+- The diagnosis response explicitly labels its analysis as rule-based (not AI-generated), requires human review, and never performs machine actions.
 
 ## Validation status
 
