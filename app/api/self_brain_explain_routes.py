@@ -10,6 +10,7 @@ from ml.telemetry_quality import assess_telemetry_quality
 from ml.virtual_plc import build_virtual_plc_snapshot
 from ml.virtual_plc_diagnosis import diagnose_virtual_plc_reading
 from ml.virtual_plc_explainer import explain_virtual_plc_diagnosis
+from ml.diagnosis_history import list_diagnoses, record_diagnosis
 
 router = APIRouter(prefix="/api/self-brain", tags=["self-brain"])
 _EXPLAINER_BRAIN: SelfBrainML | None = None
@@ -88,3 +89,22 @@ def self_brain_diagnose_explain(payload: dict[str, Any]) -> dict[str, Any]:
             "real_plc_connected": False,
             "write_commands_supported": False,
         }
+
+
+
+@router.post("/history")
+def save_diagnosis_history(payload: dict[str, Any]) -> dict[str, Any]:
+    """Store a diagnosis summary only; raw readings and LLM text are not persisted."""
+    try:
+        return record_diagnosis(payload)
+    except (TypeError, ValueError) as exc:
+        return {"status": "rejected", "error": str(exc)}
+
+
+@router.get("/history")
+def get_diagnosis_history(machine_id: str | None = None, limit: int = 20) -> dict[str, Any]:
+    """Return recent stored diagnosis summaries, newest first."""
+    try:
+        return list_diagnoses(machine_id=machine_id, limit=limit)
+    except (TypeError, ValueError) as exc:
+        return {"status": "rejected", "error": str(exc)}
