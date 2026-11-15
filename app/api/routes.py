@@ -15,6 +15,7 @@ from ml.maintenance_investigation_report import build_maintenance_investigation_
 from ml.maintenance_report_history import get_report, list_reports, save_report
 from ml.maintenance_report_trends import summarize_report_trends
 from ml.maintenance_timeline import build_maintenance_timeline
+from ml.maintenance_effectiveness import summarize_maintenance_effectiveness
 from ml.telemetry_ingestion import ingest_batch, ingest_reading, recent_telemetry
 from ml.telemetry_quality import assess_telemetry_quality
 from ml.time_series_intelligence import analyze_trends
@@ -631,6 +632,27 @@ def verified_maintenance_insights(
         return store.insights(machine_id=machine_id, fault_code=fault_code)
     finally:
         store.close()
+
+
+@router.get("/maintenance-learning/effectiveness")
+def verified_maintenance_effectiveness(
+    machine_id: str | None = None,
+    fault_code: str | None = None,
+    limit: int = 100,
+) -> dict:
+    """Summarize repeat faults and recorded repair outcomes from verified records."""
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
+        return {"status": "rejected", "error": "limit must be an integer between 1 and 100"}
+    store = VerifiedMaintenanceLearning(VERIFIED_MAINTENANCE_DB)
+    try:
+        history = store.list_outcomes(machine_id=machine_id, limit=limit)
+    finally:
+        store.close()
+    if history.get("status") != "ok":
+        return history
+    return summarize_maintenance_effectiveness(
+        history["outcomes"], machine_id=machine_id, fault_code=fault_code
+    )
 
 
 
