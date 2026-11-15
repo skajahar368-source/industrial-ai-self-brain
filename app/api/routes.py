@@ -14,6 +14,7 @@ from ml.industrial_assistant import ask_industrial_assistant
 from ml.maintenance_investigation_report import build_maintenance_investigation_report
 from ml.maintenance_report_history import get_report, list_reports, save_report
 from ml.maintenance_report_trends import summarize_report_trends
+from ml.maintenance_timeline import build_maintenance_timeline
 from ml.telemetry_ingestion import ingest_batch, ingest_reading, recent_telemetry
 from ml.telemetry_quality import assess_telemetry_quality
 from ml.time_series_intelligence import analyze_trends
@@ -384,6 +385,38 @@ def maintenance_investigation_report_trends(
         for item in history["reports"]
     ]
     return summarize_report_trends(full_reports, str(machine_id).strip())
+
+
+@router.get("/maintenance/timeline")
+def maintenance_timeline(machine_id: str | None = None, limit: int = 100) -> dict:
+    """Merge archived reports and verified repair records into a machine timeline."""
+    if machine_id is None or not str(machine_id).strip():
+        return {"status": "rejected", "error": "machine_id is required"}
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
+        return {"status": "rejected", "error": "limit must be an integer between 1 and 100"}
+
+    normalized_machine_id = str(machine_id).strip()
+    report_history = list_reports(
+        MAINTENANCE_REPORT_HISTORY_DB, machine_id=normalized_machine_id, limit=100
+    )
+    if report_history.get("status") != "ok":
+        return report_history
+
+    store = VerifiedMaintenanceLearning(VERIFIED_MAINTENANCE_DB)
+    try:
+        maintenance_history = store.list_outcomes(machine_id=normalized_machine_id, limit=100)
+    finally:
+        store.close()
+    if maintenance_history.get("status") != "ok":
+        return maintenance_history
+
+    full_reports = [
+        get_report(item["report_id"], MAINTENANCE_REPORT_HISTORY_DB)
+        for item in report_history["reports"]
+    ]
+    return build_maintenance_timeline(
+        full_reports, maintenance_history["outcomes"], normalized_machine_id, limit
+    )
 
 
 @router.post("/maintenance/investigation-report/download")
