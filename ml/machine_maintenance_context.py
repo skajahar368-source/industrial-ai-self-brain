@@ -16,6 +16,8 @@ def build_machine_maintenance_context(
     maintenance_effectiveness: dict[str, Any],
     component_history: dict[str, Any],
     component_service_life: dict[str, Any],
+    *,
+    telemetry_quality: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Assemble current telemetry and historical evidence for one exact machine."""
     if not isinstance(machine_id, str) or not machine_id.strip():
@@ -83,11 +85,19 @@ def build_machine_maintenance_context(
     verified_case_count = sum(
         int(item.get("verified_cases", 0) or 0) for item in effectiveness_groups
     )
+    quality_summary = telemetry_quality if isinstance(telemetry_quality, dict) else {
+        "status": "insufficient_data", "quality": "unknown", "issues": [], "issue_count": 0
+    }
 
     return {
         "status": "ok",
         "machine_id": machine_id,
         "view_type": "read_only_machine_maintenance_context",
+        "telemetry_data_quality": {
+            **quality_summary,
+            "source_label": "deterministic_telemetry_quality_checks",
+            "interpretation": "Flags indicate data-quality concerns, not machine faults. Review raw readings and sensor condition.",
+        },
         "current_snapshot": {
             "latest_telemetry": telemetry[0] if telemetry else None,
             "telemetry_records_returned": len(telemetry),
@@ -132,6 +142,7 @@ def build_machine_maintenance_context(
         },
         "evidence_coverage": {
             "telemetry_available": bool(telemetry),
+            "telemetry_quality_degraded": quality_summary.get("quality") == "degraded",
             "alarm_history_available": bool(alarms),
             "maintenance_timeline_available": bool(timeline_events),
             "verified_maintenance_available": verified_case_count > 0,
