@@ -16,6 +16,7 @@ from ml.maintenance_report_history import get_report, list_reports, save_report
 from ml.maintenance_report_trends import summarize_report_trends
 from ml.maintenance_timeline import build_maintenance_timeline
 from ml.maintenance_effectiveness import summarize_maintenance_effectiveness
+from ml.machine_maintenance_context import build_machine_maintenance_context
 from ml.telemetry_ingestion import ingest_batch, ingest_reading, recent_telemetry
 from ml.telemetry_quality import assess_telemetry_quality
 from ml.time_series_intelligence import analyze_trends
@@ -419,6 +420,72 @@ def maintenance_timeline(machine_id: str | None = None, limit: int = 100) -> dic
     ]
     return build_maintenance_timeline(
         full_reports, maintenance_history["outcomes"], normalized_machine_id, limit
+    )
+
+
+@router.get("/maintenance/investigation-context")
+def machine_maintenance_investigation_context(
+    machine_id: str | None = None,
+    limit: int = 50,
+) -> dict:
+    """Assemble current and historical evidence for one machine; read-only."""
+    if machine_id is None or not str(machine_id).strip():
+        return {"status": "rejected", "error": "machine_id is required"}
+    if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
+        return {"status": "rejected", "error": "limit must be an integer between 1 and 100"}
+
+    normalized_machine_id = str(machine_id).strip()
+    try:
+        telemetry_records = recent_telemetry(
+            machine_id=normalized_machine_id, limit=limit
+        )
+    except ValueError as exc:
+        return {"status": "rejected", "error": str(exc)}
+
+    alarm_snapshot = _ALARM_MANAGER.snapshot(machine_id=normalized_machine_id)
+    report_history = list_reports(
+        MAINTENANCE_REPORT_HISTORY_DB, machine_id=normalized_machine_id, limit=100
+    )
+    if report_history.get("status") != "ok":
+        return report_history
+    full_reports = [
+        get_report(item["report_id"], MAINTENANCE_REPORT_HISTORY_DB)
+        for item in report_history["reports"]
+    ]
+
+    maintenance_store = VerifiedMaintenanceLearning(VERIFIED_MAINTENANCE_DB)
+    try:
+        maintenance_history = maintenance_store.list_outcomes(
+            machine_id=normalized_machine_id, limit=100
+        )
+    finally:
+        maintenance_store.close()
+    if maintenance_history.get("status") != "ok":
+        return maintenance_history
+
+    timeline = build_maintenance_timeline(
+        full_reports, maintenance_history["outcomes"], normalized_machine_id, limit
+    )
+    effectiveness = summarize_maintenance_effectiveness(
+        maintenance_history["outcomes"], machine_id=normalized_machine_id
+    )
+    component_history = component_lifecycle_history(
+        machine_id=normalized_machine_id, limit=500, db_path=COMPONENT_LIFECYCLE_DB
+    )
+    if component_history.get("status") != "ok":
+        return component_history
+    component_life = summarize_component_service_life(
+        component_history["events"], machine_id=normalized_machine_id
+    )
+
+    return build_machine_maintenance_context(
+        normalized_machine_id,
+        telemetry_records,
+        alarm_snapshot,
+        timeline,
+        effectiveness,
+        component_history,
+        component_life,
     )
 
 
