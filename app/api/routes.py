@@ -30,6 +30,7 @@ from ml.failure_pattern_learning import (
     summarize_learning_outcomes,
 )
 from ml.part_lifecycle import active_part_life
+from ml.component_lifecycle import record_component_event, component_lifecycle_history
 from ml.predictive_maintenance import maintenance_risk, score_dataframe
 from ml.alarm_manager import AlarmManager
 from ml.verified_maintenance_learning import VerifiedMaintenanceLearning
@@ -701,6 +702,25 @@ def record_part_replacement(payload: dict) -> dict:
 @router.post("/part-replacement/validate")
 def validate_part_replacement(payload: dict) -> dict:
     return validate_early_replacement(payload)
+
+
+COMPONENT_LIFECYCLE_DB = Path(os.environ.get(
+    "SELF_BRAIN_COMPONENT_LIFECYCLE_DB", "data/component_lifecycle.sqlite3"
+))
+
+
+@router.post("/component-lifecycle/events")
+def create_component_lifecycle_event(payload: dict) -> dict:
+    """Append an install, inspection, or removal event to the component ledger."""
+    return record_component_event(payload, COMPONENT_LIFECYCLE_DB)
+
+
+@router.get("/component-lifecycle")
+def get_component_lifecycle(machine_id: str | None = None, limit: int = 100) -> dict:
+    """Read component lifecycle events and currently installed components."""
+    return component_lifecycle_history(
+        machine_id=machine_id, limit=limit, db_path=COMPONENT_LIFECYCLE_DB
+    )
 
 
 @router.get("/spares")
