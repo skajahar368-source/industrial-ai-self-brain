@@ -31,6 +31,7 @@ from ml.failure_pattern_learning import (
 )
 from ml.part_lifecycle import active_part_life
 from ml.component_lifecycle import record_component_event, component_lifecycle_history
+from ml.component_service_life import summarize_component_service_life
 from ml.predictive_maintenance import maintenance_risk, score_dataframe
 from ml.alarm_manager import AlarmManager
 from ml.verified_maintenance_learning import VerifiedMaintenanceLearning
@@ -720,6 +721,22 @@ def get_component_lifecycle(machine_id: str | None = None, limit: int = 100) -> 
     """Read component lifecycle events and currently installed components."""
     return component_lifecycle_history(
         machine_id=machine_id, limit=limit, db_path=COMPONENT_LIFECYCLE_DB
+    )
+
+
+@router.get("/component-lifecycle/analytics")
+def component_lifecycle_analytics(
+    machine_id: str | None = None,
+    part_number: str | None = None,
+) -> dict:
+    """Summarize observed usage from completed component installation/removal pairs."""
+    history = component_lifecycle_history(
+        machine_id=machine_id, limit=500, db_path=COMPONENT_LIFECYCLE_DB
+    )
+    if history.get("status") != "ok":
+        return history
+    return summarize_component_service_life(
+        history["events"], machine_id=machine_id, part_number=part_number
     )
 
 
