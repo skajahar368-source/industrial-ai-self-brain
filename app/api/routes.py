@@ -427,12 +427,15 @@ def maintenance_timeline(machine_id: str | None = None, limit: int = 100) -> dic
 def machine_maintenance_investigation_context(
     machine_id: str | None = None,
     limit: int = 50,
+    stale_after_seconds: int = 60,
 ) -> dict:
     """Assemble current and historical evidence for one machine; read-only."""
     if machine_id is None or not str(machine_id).strip():
         return {"status": "rejected", "error": "machine_id is required"}
     if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
         return {"status": "rejected", "error": "limit must be an integer between 1 and 100"}
+    if isinstance(stale_after_seconds, bool) or not isinstance(stale_after_seconds, int) or not 1 <= stale_after_seconds <= 86400:
+        return {"status": "rejected", "error": "stale_after_seconds must be an integer between 1 and 86400"}
 
     normalized_machine_id = str(machine_id).strip()
     try:
@@ -478,6 +481,9 @@ def machine_maintenance_investigation_context(
         component_history["events"], machine_id=normalized_machine_id
     )
 
+    telemetry_quality = assess_telemetry_quality(
+        telemetry_records, stale_after_seconds=stale_after_seconds
+    )
     return build_machine_maintenance_context(
         normalized_machine_id,
         telemetry_records,
@@ -486,6 +492,7 @@ def machine_maintenance_investigation_context(
         effectiveness,
         component_history,
         component_life,
+        telemetry_quality=telemetry_quality,
     )
 
 

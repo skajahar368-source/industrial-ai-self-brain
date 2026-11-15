@@ -56,3 +56,28 @@ def test_empty_sources_are_reported_as_missing_not_as_normal():
 def test_rejects_empty_machine_id_and_invalid_telemetry_shape():
     assert build_machine_maintenance_context(" ", [], {}, {}, {}, {}, {})["status"] == "rejected"
     assert build_machine_maintenance_context("M-1", None, {}, {}, {}, {}, {})["status"] == "rejected"
+
+
+def test_includes_telemetry_quality_without_treating_it_as_a_machine_fault():
+    quality = {
+        "status": "ok",
+        "quality": "degraded",
+        "issues": [{"type": "stale_reading", "age_seconds": 90}],
+        "issue_count": 1,
+        "checked_readings": 1,
+    }
+    result = build_machine_maintenance_context(
+        "M-QUALITY", [], {}, {}, {}, {}, {}, telemetry_quality=quality
+    )
+    assert result["telemetry_data_quality"]["quality"] == "degraded"
+    assert result["telemetry_data_quality"]["issue_count"] == 1
+    assert result["evidence_coverage"]["telemetry_quality_degraded"] is True
+    assert "not machine faults" in result["telemetry_data_quality"]["interpretation"]
+
+
+def test_telemetry_quality_defaults_to_unknown_when_not_supplied():
+    result = build_machine_maintenance_context(
+        "M-UNKNOWN", [], {}, {}, {}, {}, {}
+    )
+    assert result["telemetry_data_quality"]["quality"] == "unknown"
+    assert result["evidence_coverage"]["telemetry_quality_degraded"] is False
