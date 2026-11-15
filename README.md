@@ -496,3 +496,25 @@ PYTHONPATH=. pytest -q tests/test_maintenance_timeline.py
 PYTHONPATH=. pytest -q tests/test_verified_maintenance_learning.py
 PYTHONPATH=. pytest -q
 ```
+
+
+## V3.6 — Maintenance effectiveness review
+
+The read-only endpoint `GET /api/maintenance-learning/effectiveness?machine_id=M-001&fault_code=HIGH_VIBRATION&limit=100` summarizes explicitly human-verified maintenance outcomes.
+
+- Groups recorded outcomes by machine and fault code.
+- Reports the number of verified cases, successful and unsuccessful recorded repairs, and the recorded success rate.
+- Flags repeated observations and reports the elapsed days between recorded cases.
+- Shows recorded causes, repair actions, and before/after evidence where available.
+- Supports optional machine and fault-code filters; `limit` must be between 1 and 100.
+- Excludes unverified records and makes no causal claim that a repair caused improvement or recurrence.
+- Does not retrain models, diagnose automatically, or write to PLC/SCADA controls.
+
+A repeated fault is a signal for qualified maintenance review, not proof that the previous repair failed. Success rates describe the saved verified records only and are not guaranteed future outcomes.
+
+Focused tests:
+
+```bash
+PYTHONPATH=. pytest -q tests/test_maintenance_effectiveness.py tests/test_maintenance_effectiveness_api.py
+PYTHONPATH=. pytest -q
+```
