@@ -560,3 +560,23 @@ Focused tests:
 PYTHONPATH=. pytest -q tests/test_component_service_life.py
 PYTHONPATH=. pytest -q
 ```
+
+
+## V3.9 — Machine-wide maintenance investigation view
+
+V3.9 adds a read-only machine-scoped context endpoint:
+
+- `GET /api/maintenance/investigation-context?machine_id=M-001&limit=50`
+- Combines recent recorded telemetry and observed PLC alarm history with archived investigation reports, human-verified maintenance outcomes, component lifecycle events, and completed component service-life records.
+- Keeps current snapshots separate from historical evidence and preserves source labels.
+- Includes evidence-coverage flags. A missing source is not treated as evidence that the machine is healthy.
+- `limit` controls recent telemetry and timeline events and must be between 1 and 100. The historical stores are read with their existing bounded limits (100 reports, 100 verified outcomes, and 500 component events).
+- The response is an investigation context, not an automatic diagnosis or repair recommendation. Temporal proximity does not establish causality; component removal does not necessarily indicate failure.
+- No model update or PLC/SCADA control write is performed. Human review is required.
+
+Focused tests:
+
+```bash
+PYTHONPATH=. pytest -q tests/test_machine_maintenance_context.py
+PYTHONPATH=. pytest -q
+```
