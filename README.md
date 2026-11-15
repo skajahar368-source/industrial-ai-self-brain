@@ -580,3 +580,22 @@ Focused tests:
 PYTHONPATH=. pytest -q tests/test_machine_maintenance_context.py
 PYTHONPATH=. pytest -q
 ```
+
+
+## V3.10 — Telemetry evidence-quality integration
+
+V3.10 adds deterministic telemetry-quality flags to the machine-wide maintenance investigation view.
+
+- The investigation endpoint now returns a `telemetry_data_quality` section using the existing telemetry quality checks.
+- Flags include stale readings, missing required sensor fields, repeated sensor values, invalid timestamps, and unusually large step-to-step changes.
+- `stale_after_seconds` is configurable from 1 to 86,400 seconds and defaults to 60 seconds:
+  `GET /api/maintenance/investigation-context?machine_id=M-001&limit=50&stale_after_seconds=60`
+- A degraded quality flag is a warning about the data, not proof of a machine fault. An unknown quality state is returned when no readings are available.
+- Quality checks do not change readings, diagnose machine condition, train models, or write to PLC/SCADA.
+
+Focused tests:
+
+```bash
+PYTHONPATH=. pytest -q tests/test_machine_maintenance_context.py
+PYTHONPATH=. pytest -q
+```
