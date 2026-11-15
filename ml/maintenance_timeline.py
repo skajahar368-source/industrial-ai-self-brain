@@ -5,7 +5,7 @@ caused a later condition change, diagnose faults, retrain models, or control PLC
 """
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any
 
 
@@ -17,7 +17,7 @@ def _timestamp(value: Any) -> datetime | None:
     except ValueError:
         return None
     if parsed.tzinfo is None:
-        return parsed.replace(tzinfo=__import__("datetime").timezone.utc)
+        return parsed.replace(tzinfo=timezone.utc)
     return parsed
 
 
@@ -43,7 +43,9 @@ def build_maintenance_timeline(
         summary = report.get("summary")
         if not isinstance(summary, dict):
             continue
-        event_time = report.get("archived_at_utc") or summary.get("timestamp")
+        # The summary timestamp is when the machine reading was observed.
+        # archived_at_utc is only the storage time and may be much later.
+        event_time = summary.get("timestamp") or report.get("archived_at_utc")
         parsed = _timestamp(event_time)
         if parsed is None:
             continue
