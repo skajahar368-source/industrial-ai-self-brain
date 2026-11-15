@@ -540,3 +540,23 @@ Focused tests:
 PYTHONPATH=. pytest -q tests/test_component_lifecycle.py
 PYTHONPATH=. pytest -q
 ```
+
+
+## V3.8 — Recorded component service-life analytics
+
+V3.8 adds descriptive analytics over the V3.7 component event ledger.
+
+- `GET /api/component-lifecycle/analytics` summarizes completed installation-to-removal intervals across recorded components.
+- Optional `machine_id` and `part_number` filters narrow the results.
+- Each completed interval reports observed runtime hours, production cycles, calendar days, recorded removal reason, and linked install/remove event IDs.
+- Per-part summaries report sample count, average and median observed runtime, average observed production cycles, and median calendar days.
+- Active installations are counted separately and are not treated as completed service-life observations.
+
+The analytics describe recorded history only. A component may be removed for scheduled replacement or inspection rather than failure. The results are not rated-life limits, failure probabilities, remaining-useful-life estimates, or predictions. The endpoint is read-only and does not write to PLC/SCADA.
+
+Focused tests:
+
+```bash
+PYTHONPATH=. pytest -q tests/test_component_service_life.py
+PYTHONPATH=. pytest -q
+```
