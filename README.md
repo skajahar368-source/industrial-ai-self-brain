@@ -474,3 +474,25 @@ PYTHONPATH=. pytest -q
 ```
 
 The trend summary describes changes in archived report fields only. It does not claim that one condition caused another, does not diagnose the machine, does not retrain models, and performs no PLC/SCADA control writes. Human maintenance review remains required.
+
+
+## V3.5 — Machine maintenance intelligence timeline
+
+The read-only endpoint `GET /api/maintenance/timeline?machine_id=M-001&limit=100` merges two separately labeled event sources into one newest-first timeline:
+
+- Archived investigation reports, including their recorded health, risk, fault, anomaly, and evidence-quality fields.
+- Individual maintenance outcomes explicitly marked human-verified, including repair action and verification evidence.
+- Filters by exact machine ID and supports a bounded limit from 1 to 100.
+- Returns event counts and preserves source labels so AI-assisted reports are not confused with verified repair records.
+- Events are ordered by their recorded timestamps. Temporal proximity does not establish that a repair caused a later machine-condition change.
+- No automatic diagnosis, model update, or PLC/SCADA control write is performed.
+
+The timeline is a historical navigation and evidence feature, not a causal analysis or an automated maintenance recommendation.
+
+Run focused tests:
+
+```bash
+PYTHONPATH=. pytest -q tests/test_maintenance_timeline.py
+PYTHONPATH=. pytest -q tests/test_verified_maintenance_learning.py
+PYTHONPATH=. pytest -q
+```

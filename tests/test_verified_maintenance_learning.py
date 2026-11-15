@@ -78,3 +78,19 @@ def test_invalid_timestamp_is_blocked(tmp_path):
     result = store.record(valid_outcome(event_timestamp="yesterday"))
     assert result["status"] == "blocked"
     store.close()
+
+
+def test_list_outcomes_returns_individual_verified_records_newest_first(tmp_path):
+    store = VerifiedMaintenanceLearning(tmp_path / "learning.sqlite3")
+    assert store.record(valid_outcome())["status"] == "recorded"
+    assert store.record(valid_outcome(
+        event_timestamp="2026-10-14T11:00:00Z",
+        repair_action="inspect alignment",
+    ))["status"] == "recorded"
+    result = store.list_outcomes(machine_id="M-TEST")
+    assert result["status"] == "ok"
+    assert result["count"] == 2
+    assert result["outcomes"][0]["event_timestamp"] == "2026-10-14T11:00:00+00:00"
+    assert result["outcomes"][0]["verified"] is True
+    assert result["verified_only"] is True
+    store.close()

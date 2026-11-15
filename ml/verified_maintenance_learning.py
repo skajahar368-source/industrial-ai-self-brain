@@ -150,6 +150,45 @@ class VerifiedMaintenanceLearning:
             "control_write_performed": False,
         }
 
+    def list_outcomes(
+        self, machine_id: str | None = None, limit: int = 100
+    ) -> dict[str, Any]:
+        """Return individual human-verified repair records, newest event first."""
+        if isinstance(limit, bool) or not isinstance(limit, int) or not 1 <= limit <= 100:
+            return {"status": "rejected", "error": "limit must be an integer between 1 and 100"}
+        if machine_id is not None:
+            machine_id = str(machine_id).strip()
+            if not machine_id:
+                return {"status": "rejected", "error": "machine_id cannot be empty"}
+
+        query = (
+            "SELECT outcome_id, event_timestamp, machine_id, fault_code, cause, "
+            "repair_action, repair_successful, verified, verified_by, "
+            "verification_method, verification_result, before_evidence, "
+            "after_evidence, recorded_at FROM verified_outcomes WHERE verified = 1"
+        )
+        params: list[Any] = []
+        if machine_id is not None:
+            query += " AND machine_id = ?"
+            params.append(machine_id)
+        query += " ORDER BY event_timestamp DESC, recorded_at DESC LIMIT ?"
+        params.append(limit)
+        rows = self._connection.execute(query, params).fetchall()
+        records = []
+        for row in rows:
+            item = dict(row)
+            item["repair_successful"] = bool(item["repair_successful"])
+            item["verified"] = bool(item["verified"])
+            records.append(item)
+        return {
+            "status": "ok",
+            "count": len(records),
+            "outcomes": records,
+            "verified_only": True,
+            "model_updated": False,
+            "control_write_performed": False,
+        }
+
     def insights(
         self,
         machine_id: str | None = None,
