@@ -518,3 +518,25 @@ Focused tests:
 PYTHONPATH=. pytest -q tests/test_maintenance_effectiveness.py tests/test_maintenance_effectiveness_api.py
 PYTHONPATH=. pytest -q
 ```
+
+
+## V3.7 — Append-only component lifecycle ledger
+
+V3.7 adds a separate SQLite event ledger for component-level history. It complements the existing part-life threshold calculation and CSV replacement examples with explicit install, inspection, and removal events.
+
+- `POST /api/component-lifecycle/events` records an event. Every event requires `machine_id`, `component_id`, an ISO-8601 `event_timestamp`, `runtime_hours`, and `production_cycles`.
+- An `install` event also requires `part_number` and `part_name`.
+- An `inspection` event records optional condition, evidence, and maintenance notes for an installed component.
+- A `remove` event requires `removal_reason`; optional fields can record the maintenance action and evidence.
+- `GET /api/component-lifecycle?machine_id=M-001&limit=100` returns newest-first events and currently installed components. The limit must be between 1 and 500.
+- The ledger rejects duplicate active installations, inspection/removal without an active installation, duplicate event IDs, invalid timestamps, and decreasing usage meters.
+- The database defaults to `data/component_lifecycle.sqlite3`; override it with `SELF_BRAIN_COMPONENT_LIFECYCLE_DB`.
+
+A completed installed-to-removed usage interval can be calculated from its recorded event meters. An active component has no completed lifespan yet. These records do not establish a predicted failure date or failure probability. The ledger does not diagnose automatically, update models, or write to PLC/SCADA controls.
+
+Focused tests:
+
+```bash
+PYTHONPATH=. pytest -q tests/test_component_lifecycle.py
+PYTHONPATH=. pytest -q
+```
